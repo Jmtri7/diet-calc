@@ -375,7 +375,7 @@
         </div>
       </div>
     </div>
-    <p class="hint">Enter how many hours per day the pump runs (1&ndash;24). Free water is split across flushes at the interval you choose.</p>
+    <p class="hint">Enter how many hours per day the pump runs (1&ndash;24). Free water is split across the flushes given while the pump runs, at the interval you choose.</p>
   </section>
 
   <!-- Body results -->
@@ -459,7 +459,7 @@
     <div class="target" id="tfFluid"></div>
     <div class="target" id="tfTotal"></div>
     <p class="hint" id="tfSummary"></p>
-    <p class="hint">Needs come from the weight-based, protein and fluid ranges selected on this page. Formula amount = kcal needed &divide; energy density, divided by feedings and rounded to the nearest mL. Bolus flush = (desired fluid &minus; fluid in formula) &divide; (feedings &times; 2), given before and after each feeding. For continuous feeding, formula per day is divided by the hours the pump runs, and the free water is split across the flushes in 24 hours.</p>
+    <p class="hint">Needs come from the weight-based, protein and fluid ranges selected on this page. Formula amount = kcal needed &divide; energy density, divided by feedings and rounded to the nearest mL. Bolus flush = (desired fluid &minus; fluid in formula) &divide; (feedings &times; 2), given before and after each feeding. For continuous feeding, formula per day is divided by the hours the pump runs, and the free water is split across the flushes given during those pump hours (hours &divide; flush interval, rounded).</p>
   </section>
 
   <section data-pages="tube">
@@ -689,7 +689,7 @@
     const hours = positive($('hours')) <= 24 ? positive($('hours')) : NaN;
     const flushEvery = positive($('flushEvery')) <= 24 ? positive($('flushEvery')) : NaN;
     const units = continuous ? hours : feeds; // feedings, or hours of pump time
-    const flushes = continuous ? Math.max(1, Math.round(24 / flushEvery)) : feeds * 2;
+    const flushes = continuous ? Math.max(1, Math.round(hours / flushEvery)) : feeds * 2; // continuous: flushes during pump hours
     const missing = Number.isNaN(basisKg)
       ? (basis === 'actual' ? 'Enter weight' : 'Enter weight and height')
       : continuous
@@ -757,7 +757,7 @@
       const unitName = continuous ? 'hours' : 'feedings';
       const perName = continuous ? 'mL per hour' : 'mL per feeding';
       const flushDiv = continuous
-        ? `${flushes} flushes (24 h ÷ ${fmt(flushEvery)} h)`
+        ? `${flushes} flushes (${fmt(hours)} h pump time ÷ ${fmt(flushEvery)} h, rounded)`
         : `${flushes} flushes (${feeds} feedings × 2)`;
       const step = (title, f) =>
         `<div class="step"><b>${title}</b><div>Low: ${f(a, kLo, mLo)}</div><div>High: ${f(b, kHi, mHi)}</div></div>`;
