@@ -47,7 +47,7 @@
   }
   .tabs {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     max-width: 640px;
     margin: 0 auto;
     padding: 0 16px;
@@ -60,8 +60,8 @@
     color: var(--muted);
     font: inherit;
     font-weight: 600;
-    font-size: .95rem;
-    padding: 14px 4px 10px;
+    font-size: .9rem;
+    padding: 14px 2px 10px;
     cursor: pointer;
   }
   .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
@@ -129,6 +129,7 @@
     <button class="tab" role="tab" data-page="energy">Energy</button>
     <button class="tab" role="tab" data-page="protein">Protein</button>
     <button class="tab" role="tab" data-page="fluid">Fluid</button>
+    <button class="tab" role="tab" data-page="tube">Tube</button>
   </div>
   <div class="pageno" id="pageno"></div>
 </div>
@@ -136,7 +137,7 @@
 <main>
   <h1 id="pageTitle">Diet Calculator</h1>
 
-  <section data-pages="body energy protein fluid">
+  <section data-pages="body energy protein fluid tube">
     <h2>Weight</h2>
     <div class="row">
       <div>
@@ -157,7 +158,7 @@
     <p class="hint">Type in either box; the other updates automatically.</p>
   </section>
 
-  <section data-pages="body energy" data-pages-basis="protein fluid">
+  <section data-pages="body energy" data-pages-basis="protein fluid tube">
     <h2>Height</h2>
     <div class="row">
       <div>
@@ -186,7 +187,7 @@
     </div>
   </section>
 
-  <section data-pages="body energy" data-pages-basis="protein fluid">
+  <section data-pages="body energy" data-pages-basis="protein fluid tube">
     <h2>Sex</h2>
     <div class="choices">
       <label>
@@ -214,7 +215,7 @@
     </div>
   </section>
 
-  <section data-pages="body" data-pages-basis="energy protein fluid">
+  <section data-pages="body" data-pages-basis="energy protein fluid tube">
     <h2>Ideal body weight formula</h2>
     <div class="choices">
       <label>
@@ -228,7 +229,7 @@
     </div>
   </section>
 
-  <section data-pages="energy protein fluid">
+  <section data-pages="energy protein fluid tube">
     <h2>Weight used for the calculation</h2>
     <div class="choices three">
       <label>
@@ -256,7 +257,7 @@
     </select>
   </section>
 
-  <section data-pages="energy">
+  <section data-pages="energy tube">
     <h2>Weight-based range</h2>
     <div class="choices three">
       <label>
@@ -274,7 +275,7 @@
     </div>
   </section>
 
-  <section data-pages="fluid">
+  <section data-pages="fluid tube">
     <h2>Fluid range</h2>
     <div class="choices">
       <label>
@@ -288,7 +289,7 @@
     </div>
   </section>
 
-  <section data-pages="protein">
+  <section data-pages="protein tube">
     <h2>Protein need</h2>
     <select id="proteinLevel" aria-label="Protein need">
       <option value="0.8,1">Healthy adult (0.8&ndash;1.0 g/kg)</option>
@@ -296,6 +297,38 @@
       <option value="1.2,1.5">Moderate stress or wound healing (1.2&ndash;1.5 g/kg)</option>
       <option value="1.5,2">Critical illness, burns or major trauma (1.5&ndash;2.0 g/kg)</option>
     </select>
+  </section>
+
+  <section data-pages="tube">
+    <h2>Formula energy density</h2>
+    <select id="density" aria-label="Formula energy density">
+      <option value="1.0">1.0 kcal/mL (84% water)</option>
+      <option value="1.2">1.2 kcal/mL (81% water)</option>
+      <option value="1.5" selected>1.5 kcal/mL (76% water)</option>
+      <option value="1.8">1.8 kcal/mL (73% water)</option>
+      <option value="2.0">2.0 kcal/mL (70% water)</option>
+    </select>
+  </section>
+
+  <section data-pages="tube">
+    <h2>Formula and feedings</h2>
+    <div class="row">
+      <div>
+        <label for="proteinPerL">Protein per liter</label>
+        <div class="field">
+          <input id="proteinPerL" type="number" inputmode="decimal" min="0" step="any" value="60">
+          <span class="unit">g/L</span>
+        </div>
+      </div>
+      <div>
+        <label for="feeds">Feedings per day</label>
+        <div class="field">
+          <input id="feeds" type="number" inputmode="numeric" min="1" step="1" value="4">
+          <span class="unit">/day</span>
+        </div>
+      </div>
+    </div>
+    <p class="hint">Check the formula label for grams of protein per liter. The 60 g/L shown is only a placeholder.</p>
   </section>
 
   <!-- Body results -->
@@ -357,6 +390,31 @@
     <p class="hint">Main estimate: the mL/kg range selected above, applied to the selected weight. The Holliday-Segar method (100 mL/kg for the first 10 kg, 50 mL/kg for the next 10, 20 mL/kg after) uses actual weight.</p>
   </section>
 
+  <!-- Tube feeding results -->
+  <section class="results" data-pages="tube">
+    <h2>Formula per feeding</h2>
+    <div class="bmi-value" id="tfFeed">&ndash;</div>
+    <div class="bmi-cat" id="tfFeedNote">Enter weight and feedings per day</div>
+    <div class="target" id="tfVolume"></div>
+    <div class="target" id="tfBasis"></div>
+  </section>
+
+  <section class="results" data-pages="tube">
+    <h2>Free water flush</h2>
+    <div class="bmi-value" id="tfFlush">&ndash;</div>
+    <div class="bmi-cat" id="tfFlushNote"></div>
+  </section>
+
+  <section class="results" data-pages="tube">
+    <h2>Provided each day</h2>
+    <div class="target" id="tfEnergy"></div>
+    <div class="target" id="tfProtein"></div>
+    <div class="target" id="tfFluid"></div>
+    <div class="target" id="tfTotal"></div>
+    <p class="hint" id="tfSummary"></p>
+    <p class="hint">Needs come from the weight-based, protein and fluid ranges selected on this page. Formula amount = kcal needed &divide; energy density, divided by feedings and rounded to the nearest mL. Flush = (desired fluid &minus; fluid in formula) &divide; (feedings &times; 2), given before and after each feeding.</p>
+  </section>
+
   <p class="disclaimer">Estimates for education only. Not medical advice.</p>
 </main>
 
@@ -371,6 +429,7 @@
     { id: 'energy', title: 'Energy needs' },
     { id: 'protein', title: 'Protein needs' },
     { id: 'fluid', title: 'Fluid needs' },
+    { id: 'tube', title: 'Tube feeding' },
   ];
   let page = 'body';
 
@@ -426,7 +485,7 @@
   const both = kgVal => `${fmt(kgVal * LB_PER_KG)} lb / ${fmt(kgVal)} kg`;
   const bothRange = (a, b) =>
     `${fmt(a * LB_PER_KG)}–${fmt(b * LB_PER_KG)} lb / ${fmt(a)}–${fmt(b)} kg`;
-  const span = (a, b, f = whole) => (Math.round(a) === Math.round(b) ? f(a) : `${f(a)}–${f(b)}`);
+  const span = (a, b, f = whole) => (f(a) === f(b) ? f(a) : `${f(a)}–${f(b)}`);
 
   // ---- Formulas ----
   // Ideal body weight in kg for height in inches
@@ -566,6 +625,58 @@
     }
     $('fluidBasis').textContent = basisText;
 
+    // Tube feeding: formula amount, loads and flushes at the low and high end of each range
+    const density = parseFloat($('density').value);
+    const waterPct = { '1.0': 84, '1.2': 81, '1.5': 76, '1.8': 73, '2.0': 70 }[$('density').value];
+    const gPerL = positive($('proteinPerL'));
+    const feeds = Math.round(positive($('feeds')));
+    const tf = ['tfEnergy', 'tfProtein', 'tfFluid', 'tfTotal', 'tfSummary', 'tfVolume', 'tfFlushNote'];
+    $('tfBasis').textContent = basisText;
+    if (Number.isNaN(basisKg) || Number.isNaN(feeds)) {
+      for (const id of tf) $(id).textContent = '';
+      $('tfFeed').textContent = '–';
+      $('tfFlush').textContent = '–';
+      $('tfFeedNote').textContent = Number.isNaN(basisKg)
+        ? (basis === 'actual' ? 'Enter weight' : 'Enter weight and height')
+        : 'Enter feedings per day';
+    } else {
+      const calc = (kcalPerKg, mlPerKg) => {
+        const perFeed = Math.round(kcalPerKg * basisKg / density / feeds);
+        const volume = perFeed * feeds; // mL formula per day
+        const fluidIn = volume * waterPct / 100;
+        const flush = Math.max(0, Math.round((mlPerKg * basisKg - fluidIn) / (feeds * 2)));
+        return {
+          perFeed, volume, fluidIn, flush,
+          kcal: volume * density,
+          protein: Number.isNaN(gPerL) ? NaN : volume / 1000 * gPerL,
+          total: fluidIn + flush * feeds * 2,
+        };
+      };
+      const a = calc(kLo, mLo), b = calc(kHi, mHi);
+      const rng = (x, y, unit, f = whole) => `${span(x, y, f)} ${unit}`;
+      $('tfFeed').textContent = rng(a.perFeed, b.perFeed, 'mL');
+      $('tfFeedNote').textContent = `${feeds} feeding${feeds === 1 ? '' : 's'} per day`;
+      $('tfVolume').textContent =
+        `Formula per day: ${rng(a.volume, b.volume, 'mL')} (${span(a.volume / 1000, b.volume / 1000, fmt)} L) of ${density.toFixed(1)} kcal/mL`;
+      $('tfFlush').textContent = a.flush === 0 && b.flush === 0 ? 'None needed' : rng(a.flush, b.flush, 'mL');
+      $('tfFlushNote').textContent = a.flush === 0 && b.flush === 0
+        ? 'Formula alone meets the fluid need'
+        : 'water before and after each feeding';
+      $('tfEnergy').textContent =
+        `Energy: ${rng(a.kcal, b.kcal, 'kcal')} (need ${rng(kLo * basisKg, kHi * basisKg, 'kcal')})`;
+      $('tfProtein').textContent = Number.isNaN(gPerL)
+        ? 'Protein: enter grams per liter'
+        : `Protein: ${rng(a.protein, b.protein, 'g')} (need ${rng(pLo * basisKg, pHi * basisKg, 'g')})`;
+      $('tfFluid').textContent =
+        `Fluid from formula (${waterPct}% water): ${rng(a.fluidIn, b.fluidIn, 'mL')}`;
+      $('tfTotal').textContent =
+        `Total fluid with flushes: ${rng(a.total, b.total, 'mL')} (need ${rng(mLo * basisKg, mHi * basisKg, 'mL')})`;
+      $('tfSummary').textContent =
+        `Regimen: ${density.toFixed(1)} kcal/mL formula, ${rng(a.perFeed, b.perFeed, 'mL')} per feeding, ` +
+        `${feeds} time${feeds === 1 ? '' : 's'} per day` +
+        (a.flush === 0 && b.flush === 0 ? '.' : `, flushing with ${rng(a.flush, b.flush, 'mL')} water before and after each feeding.`);
+    }
+
     applyPage();
   }
 
@@ -582,7 +693,7 @@
   link(cm, inch, v => v / 2.54);
 
   // Registered after the link() handlers so paired fields are in sync first
-  [lb, kg, inch, cm, age].forEach(el => el.addEventListener('input', update));
+  [lb, kg, inch, cm, age, $('proteinPerL'), $('feeds')].forEach(el => el.addEventListener('input', update));
   document.querySelectorAll('input[type="radio"], select')
     .forEach(el => el.addEventListener('change', update));
 

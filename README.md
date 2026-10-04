@@ -2,7 +2,7 @@
 
 A single-file, mobile-friendly calculator for body measurements and nutrition needs. Open `index.html` in any browser. There is no build step or dependency.
 
-Results update as you type. The page is split into four tabs, and the active tab is highlighted at the top. On a phone, swipe right for the next page and swipe left for the previous one. Each page shows only the inputs it needs.
+Results update as you type. The page is split into five tabs, and the active tab is highlighted at the top. On a phone, swipe right for the next page and swipe left for the previous one. Each page shows only the inputs it needs.
 
 | Page | What it calculates |
 |---|---|
@@ -11,6 +11,8 @@ Results update as you type. The page is split into four tabs, and the active tab
 | Protein | g/day range from a chosen need level (0.8–2.0 g/kg) |
 | Fluid | a choice of 25–30 or 30–35 mL/kg, plus the Holliday-Segar estimate |
 
-Energy, protein and fluid can use actual, ideal or adjusted body weight.
+| Tube | Formula per feeding from kcal needs and energy density (1.0–2.0 kcal/mL), free water flush before and after each feeding, and the energy, protein and fluid provided each day, as a low–high range |
+
+Energy, protein, fluid and tube feeding can use actual, ideal or adjusted body weight.
 
 Estimates for education only. Not medical advice.
