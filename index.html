@@ -119,6 +119,11 @@
   .choices input:checked + span { border-color: var(--accent); background: var(--result-bg); }
   .choices input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
   .target { margin-top: 12px; color: var(--muted); }
+  details summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 4px 0; }
+  details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .step { margin-top: 16px; }
+  .step b { display: block; }
+  .step div { color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
   .disclaimer { color: var(--muted); font-size: .8rem; text-align: center; }
 </style>
 </head>
@@ -457,6 +462,13 @@
     <p class="hint">Needs come from the weight-based, protein and fluid ranges selected on this page. Formula amount = kcal needed &divide; energy density, divided by feedings and rounded to the nearest mL. Bolus flush = (desired fluid &minus; fluid in formula) &divide; (feedings &times; 2), given before and after each feeding. For continuous feeding, formula per day is divided by the hours the pump runs, and the free water is split across the flushes in 24 hours.</p>
   </section>
 
+  <section data-pages="tube">
+    <details>
+      <summary>Show calculation breakdown</summary>
+      <div id="tfSteps"><p class="hint">Enter the inputs above to see the steps.</p></div>
+    </details>
+  </section>
+
   <p class="disclaimer">Estimates for education only. Not medical advice.</p>
 </main>
 
@@ -686,7 +698,9 @@
     const tf = ['tfEnergy', 'tfProtein', 'tfFluid', 'tfTotal', 'tfSummary', 'tfVolume', 'tfFlushNote'];
     $('tfBasis').textContent = basisText;
     $('tfTitle').textContent = continuous ? 'Formula rate' : 'Formula per feeding';
+    const stepsEl = $('tfSteps');
     if (missing) {
+      stepsEl.innerHTML = '<p class="hint">Enter the inputs above to see the steps.</p>';
       for (const id of tf) $(id).textContent = '';
       $('tfFeed').textContent = '–';
       $('tfFlush').textContent = '–';
@@ -697,8 +711,12 @@
         const volume = perFeed * units; // mL formula per day
         const fluidIn = volume * waterPct / 100;
         const flush = Math.max(0, Math.round((mlPerKg * basisKg - fluidIn) / flushes));
+        const kcalNeed = kcalPerKg * basisKg;
+        const desired = mlPerKg * basisKg;
         return {
-          perFeed, volume, fluidIn, flush,
+          perFeed, volume, fluidIn, flush, kcalNeed, desired,
+          mlRaw: kcalNeed / density,
+          free: desired - fluidIn,
           kcal: volume * density,
           protein: Number.isNaN(gPerL) ? NaN : volume / 1000 * gPerL,
           total: fluidIn + flush * flushes,
@@ -732,6 +750,31 @@
           ? `${rng(a.perFeed, b.perFeed, 'mL/hr')} continuously for ${fmt(hours)} hours per day`
           : `${rng(a.perFeed, b.perFeed, 'mL')} per feeding, ${feeds} time${feeds === 1 ? '' : 's'} per day`) +
         (a.flush === 0 && b.flush === 0 ? '.' : `, flushing with ${rng(a.flush, b.flush, 'mL')} water ${flushWhen}.`);
+
+      // Step-by-step breakdown (low end of each range, then high end)
+      const w = fmt(basisKg);
+      const liters = mL => String(Math.round(mL) / 1000);
+      const unitName = continuous ? 'hours' : 'feedings';
+      const perName = continuous ? 'mL per hour' : 'mL per feeding';
+      const flushDiv = continuous
+        ? `${flushes} flushes (24 h ÷ ${fmt(flushEvery)} h)`
+        : `${flushes} flushes (${feeds} feedings × 2)`;
+      const step = (title, f) =>
+        `<div class="step"><b>${title}</b><div>Low: ${f(a, kLo, mLo)}</div><div>High: ${f(b, kHi, mHi)}</div></div>`;
+      stepsEl.innerHTML = [
+        step('1. Energy needed (kcal/kg × weight)', (r, k) => `${k} × ${w} kg = ${whole(r.kcalNeed)} kcal`),
+        step('2. Formula needed (kcal ÷ energy density)', r => `${whole(r.kcalNeed)} ÷ ${density.toFixed(1)} = ${whole(r.mlRaw)} mL/day`),
+        step(`3. Divide by ${unitName}, round to nearest mL`, r => `${whole(r.mlRaw)} ÷ ${fmt(units)} = ${whole(r.perFeed)} ${perName}`),
+        step('4. Formula per day after rounding', r => `${whole(r.perFeed)} × ${fmt(units)} = ${whole(r.volume)} mL (${liters(r.volume)} L)`),
+        step('5. Energy provided (volume × density)', r => `${whole(r.volume)} × ${density.toFixed(1)} = ${whole(r.kcal)} kcal`),
+        step('6. Protein provided (liters × g/L)', r => Number.isNaN(gPerL) ? 'Enter grams per liter'
+          : `${liters(r.volume)} L × ${fmt(gPerL)} g/L = ${fmt(r.protein)} g`),
+        step('7. Fluid in formula (volume × % water × 0.01)', r => `${whole(r.volume)} × ${(waterPct / 100).toFixed(2)} = ${whole(r.fluidIn)} mL`),
+        step('8. Desired fluid (mL/kg × weight)', (r, k, m) => `${m} × ${w} kg = ${whole(r.desired)} mL`),
+        step('9. Free water still needed (desired − formula fluid)', r => `${whole(r.desired)} − ${whole(r.fluidIn)} = ${whole(Math.max(0, r.free))} mL`),
+        step(`10. Flush volume (÷ ${flushDiv})`, r => `${whole(Math.max(0, r.free))} ÷ ${flushes} = ${whole(r.flush)} mL`),
+        step('11. Total fluid (formula + flushes)', r => `${whole(r.fluidIn)} + ${whole(r.flush)} × ${flushes} = ${whole(r.total)} mL`),
+      ].join('');
     }
 
     applyPage();
