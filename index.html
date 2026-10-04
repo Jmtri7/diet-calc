@@ -322,24 +322,55 @@
   </section>
 
   <section data-pages="tube">
-    <h2>Formula and feedings</h2>
+    <h2>Protein per liter</h2>
+    <div class="field">
+      <input id="proteinPerL" type="number" inputmode="decimal" min="0" step="any" value="60">
+      <span class="unit">g/L</span>
+    </div>
+    <p class="hint">For a formula not listed, enter grams of protein per liter from its label. The 60 g/L shown is only a placeholder.</p>
+  </section>
+
+  <section data-pages="tube">
+    <h2>Feeding method</h2>
+    <div class="choices">
+      <label>
+        <input type="radio" name="method" value="bolus" checked>
+        <span>Bolus<small>several feedings</small></span>
+      </label>
+      <label>
+        <input type="radio" name="method" value="continuous">
+        <span>Continuous<small>pump over hours</small></span>
+      </label>
+    </div>
+  </section>
+
+  <section data-pages="tube" data-method="bolus">
+    <h2>Feedings per day</h2>
+    <div class="field">
+      <input id="feeds" type="number" inputmode="numeric" min="1" step="1" value="4">
+      <span class="unit">/day</span>
+    </div>
+  </section>
+
+  <section data-pages="tube" data-method="continuous">
+    <h2>Continuous feeding schedule</h2>
     <div class="row">
       <div>
-        <label for="proteinPerL">Protein per liter</label>
+        <label for="hours">Duration (required)</label>
         <div class="field">
-          <input id="proteinPerL" type="number" inputmode="decimal" min="0" step="any" value="60">
-          <span class="unit">g/L</span>
+          <input id="hours" type="number" inputmode="decimal" min="1" max="24" step="any" placeholder="0">
+          <span class="unit">hr/day</span>
         </div>
       </div>
       <div>
-        <label for="feeds">Feedings per day</label>
+        <label for="flushEvery">Flush every</label>
         <div class="field">
-          <input id="feeds" type="number" inputmode="numeric" min="1" step="1" value="4">
-          <span class="unit">/day</span>
+          <input id="flushEvery" type="number" inputmode="decimal" min="1" max="24" step="any" value="4">
+          <span class="unit">hr</span>
         </div>
       </div>
     </div>
-    <p class="hint">For a formula not listed, enter grams of protein per liter from its label. The 60 g/L shown is only a placeholder.</p>
+    <p class="hint">Enter how many hours per day the pump runs (1&ndash;24). Free water is split across flushes at the interval you choose.</p>
   </section>
 
   <!-- Body results -->
@@ -403,7 +434,7 @@
 
   <!-- Tube feeding results -->
   <section class="results" data-pages="tube">
-    <h2>Formula per feeding</h2>
+    <h2 id="tfTitle">Formula per feeding</h2>
     <div class="bmi-value" id="tfFeed">&ndash;</div>
     <div class="bmi-cat" id="tfFeedNote">Enter weight and feedings per day</div>
     <div class="target" id="tfVolume"></div>
@@ -423,7 +454,7 @@
     <div class="target" id="tfFluid"></div>
     <div class="target" id="tfTotal"></div>
     <p class="hint" id="tfSummary"></p>
-    <p class="hint">Needs come from the weight-based, protein and fluid ranges selected on this page. Formula amount = kcal needed &divide; energy density, divided by feedings and rounded to the nearest mL. Flush = (desired fluid &minus; fluid in formula) &divide; (feedings &times; 2), given before and after each feeding.</p>
+    <p class="hint">Needs come from the weight-based, protein and fluid ranges selected on this page. Formula amount = kcal needed &divide; energy density, divided by feedings and rounded to the nearest mL. Bolus flush = (desired fluid &minus; fluid in formula) &divide; (feedings &times; 2), given before and after each feeding. For continuous feeding, formula per day is divided by the hours the pump runs, and the free water is split across the flushes in 24 hours.</p>
   </section>
 
   <p class="disclaimer">Estimates for education only. Not medical advice.</p>
@@ -457,7 +488,8 @@
     document.querySelectorAll('[data-pages]').forEach(el => {
       const here = el.dataset.pages.split(' ').includes(page);
       const viaBasis = needsBody && (el.dataset.pagesBasis || '').split(' ').includes(page);
-      el.hidden = !(here || viaBasis);
+      const wrongMethod = el.dataset.method && el.dataset.method !== checked('method');
+      el.hidden = !(here || viaBasis) || wrongMethod;
     });
   }
 
@@ -640,39 +672,51 @@
     const density = parseFloat($('density').value);
     const waterPct = { '1.0': 84, '1.2': 81, '1.5': 76, '1.8': 73, '2.0': 70 }[$('density').value];
     const gPerL = positive($('proteinPerL'));
+    const continuous = checked('method') === 'continuous';
     const feeds = Math.round(positive($('feeds')));
+    const hours = positive($('hours')) <= 24 ? positive($('hours')) : NaN;
+    const flushEvery = positive($('flushEvery')) <= 24 ? positive($('flushEvery')) : NaN;
+    const units = continuous ? hours : feeds; // feedings, or hours of pump time
+    const flushes = continuous ? Math.max(1, Math.round(24 / flushEvery)) : feeds * 2;
+    const missing = Number.isNaN(basisKg)
+      ? (basis === 'actual' ? 'Enter weight' : 'Enter weight and height')
+      : continuous
+        ? (Number.isNaN(hours) ? 'Enter hours per day (1–24)' : Number.isNaN(flushEvery) ? 'Enter flush interval' : '')
+        : (Number.isNaN(feeds) ? 'Enter feedings per day' : '');
     const tf = ['tfEnergy', 'tfProtein', 'tfFluid', 'tfTotal', 'tfSummary', 'tfVolume', 'tfFlushNote'];
     $('tfBasis').textContent = basisText;
-    if (Number.isNaN(basisKg) || Number.isNaN(feeds)) {
+    $('tfTitle').textContent = continuous ? 'Formula rate' : 'Formula per feeding';
+    if (missing) {
       for (const id of tf) $(id).textContent = '';
       $('tfFeed').textContent = '–';
       $('tfFlush').textContent = '–';
-      $('tfFeedNote').textContent = Number.isNaN(basisKg)
-        ? (basis === 'actual' ? 'Enter weight' : 'Enter weight and height')
-        : 'Enter feedings per day';
+      $('tfFeedNote').textContent = missing;
     } else {
       const calc = (kcalPerKg, mlPerKg) => {
-        const perFeed = Math.round(kcalPerKg * basisKg / density / feeds);
-        const volume = perFeed * feeds; // mL formula per day
+        const perFeed = Math.round(kcalPerKg * basisKg / density / units); // mL per feeding, or per hour
+        const volume = perFeed * units; // mL formula per day
         const fluidIn = volume * waterPct / 100;
-        const flush = Math.max(0, Math.round((mlPerKg * basisKg - fluidIn) / (feeds * 2)));
+        const flush = Math.max(0, Math.round((mlPerKg * basisKg - fluidIn) / flushes));
         return {
           perFeed, volume, fluidIn, flush,
           kcal: volume * density,
           protein: Number.isNaN(gPerL) ? NaN : volume / 1000 * gPerL,
-          total: fluidIn + flush * feeds * 2,
+          total: fluidIn + flush * flushes,
         };
       };
       const a = calc(kLo, mLo), b = calc(kHi, mHi);
       const rng = (x, y, unit, f = whole) => `${span(x, y, f)} ${unit}`;
-      $('tfFeed').textContent = rng(a.perFeed, b.perFeed, 'mL');
-      $('tfFeedNote').textContent = `${feeds} feeding${feeds === 1 ? '' : 's'} per day`;
+      const flushWhen = continuous ? `every ${fmt(flushEvery)} h` : 'before and after each feeding';
+      $('tfFeed').textContent = rng(a.perFeed, b.perFeed, continuous ? 'mL/hr' : 'mL');
+      $('tfFeedNote').textContent = continuous
+        ? `continuous over ${fmt(hours)} hours per day`
+        : `${feeds} feeding${feeds === 1 ? '' : 's'} per day`;
       $('tfVolume').textContent =
         `Formula per day: ${rng(a.volume, b.volume, 'mL')} (${span(a.volume / 1000, b.volume / 1000, fmt)} L) of ${density.toFixed(1)} kcal/mL`;
       $('tfFlush').textContent = a.flush === 0 && b.flush === 0 ? 'None needed' : rng(a.flush, b.flush, 'mL');
       $('tfFlushNote').textContent = a.flush === 0 && b.flush === 0
         ? 'Formula alone meets the fluid need'
-        : 'water before and after each feeding';
+        : `water ${flushWhen}`;
       $('tfEnergy').textContent =
         `Energy: ${rng(a.kcal, b.kcal, 'kcal')} (need ${rng(kLo * basisKg, kHi * basisKg, 'kcal')})`;
       $('tfProtein').textContent = Number.isNaN(gPerL)
@@ -683,9 +727,11 @@
       $('tfTotal').textContent =
         `Total fluid with flushes: ${rng(a.total, b.total, 'mL')} (need ${rng(mLo * basisKg, mHi * basisKg, 'mL')})`;
       $('tfSummary').textContent =
-        `Regimen: ${density.toFixed(1)} kcal/mL formula, ${rng(a.perFeed, b.perFeed, 'mL')} per feeding, ` +
-        `${feeds} time${feeds === 1 ? '' : 's'} per day` +
-        (a.flush === 0 && b.flush === 0 ? '.' : `, flushing with ${rng(a.flush, b.flush, 'mL')} water before and after each feeding.`);
+        `Regimen: ${density.toFixed(1)} kcal/mL formula, ` +
+        (continuous
+          ? `${rng(a.perFeed, b.perFeed, 'mL/hr')} continuously for ${fmt(hours)} hours per day`
+          : `${rng(a.perFeed, b.perFeed, 'mL')} per feeding, ${feeds} time${feeds === 1 ? '' : 's'} per day`) +
+        (a.flush === 0 && b.flush === 0 ? '.' : `, flushing with ${rng(a.flush, b.flush, 'mL')} water ${flushWhen}.`);
     }
 
     applyPage();
@@ -704,7 +750,7 @@
   link(cm, inch, v => v / 2.54);
 
   // Registered after the link() handlers so paired fields are in sync first
-  [lb, kg, inch, cm, age, $('proteinPerL'), $('feeds')].forEach(el => el.addEventListener('input', update));
+  [lb, kg, inch, cm, age, $('proteinPerL'), $('feeds'), $('hours'), $('flushEvery')].forEach(el => el.addEventListener('input', update));
   document.querySelectorAll('input[type="radio"], select:not(#product)')
     .forEach(el => el.addEventListener('change', update));
 
