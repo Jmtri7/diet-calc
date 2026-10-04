@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diet Calculator</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --text: #1c2430;
+    --muted: #5d6b7c;
+    --border: #d5dce4;
+    --accent: #2563eb;
+    --result-bg: #eef4ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c;
+      --card: #1b212a;
+      --text: #e8edf3;
+      --muted: #9aa7b6;
+      --border: #333d4a;
+      --accent: #6b9bff;
+      --result-bg: #202b3d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 18px;
+    line-height: 1.4;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font-size: 1.6rem; margin: 8px 0 16px; }
+
+  /* Tab bar */
+  .tabbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 16px;
+  }
+  .tab {
+    appearance: none;
+    background: none;
+    border: 0;
+    border-bottom: 4px solid transparent;
+    color: var(--muted);
+    font: inherit;
+    font-weight: 600;
+    font-size: .95rem;
+    padding: 14px 4px 10px;
+    cursor: pointer;
+  }
+  .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .pageno { text-align: center; color: var(--muted); font-size: .8rem; padding: 6px 0 0; }
+
+  section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  [hidden] { display: none !important; }
+  h2 { font-size: 1.1rem; margin: 0 0 16px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 480px) { .row { grid-template-columns: 1fr; } }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .field { position: relative; }
+  input[type="number"], select {
+    width: 100%;
+    font-size: 1.4rem;
+    padding: 12px 56px 12px 14px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  select { font-size: 1.1rem; padding-right: 14px; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .unit {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .hint { color: var(--muted); font-size: .85rem; margin: 12px 0 0; }
+  .bmi-value { font-size: 2.6rem; font-weight: 700; line-height: 1.1; }
+  .bmi-cat { font-size: 1.2rem; font-weight: 600; margin-top: 4px; color: var(--accent); }
+  .results { background: var(--result-bg); }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .choices.three { grid-template-columns: repeat(3, 1fr); }
+  .choices label { margin: 0; cursor: pointer; }
+  .choices input { position: absolute; opacity: 0; width: 1px; height: 1px; padding: 0; }
+  .choices span {
+    display: block;
+    text-align: center;
+    padding: 14px 8px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .choices small { display: block; color: var(--muted); font-weight: 400; }
+  .choices input:checked + span { border-color: var(--accent); background: var(--result-bg); }
+  .choices input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .target { margin-top: 12px; color: var(--muted); }
+  .disclaimer { color: var(--muted); font-size: .8rem; text-align: center; }
+</style>
+</head>
+<body>
+<div class="tabbar">
+  <div class="tabs" role="tablist" aria-label="Calculator pages">
+    <button class="tab" role="tab" data-page="body">Body</button>
+    <button class="tab" role="tab" data-page="energy">Energy</button>
+    <button class="tab" role="tab" data-page="protein">Protein</button>
+    <button class="tab" role="tab" data-page="fluid">Fluid</button>
+  </div>
+  <div class="pageno" id="pageno"></div>
+</div>
+
+<main>
+  <h1 id="pageTitle">Diet Calculator</h1>
+
+  <section data-pages="body energy protein fluid">
+    <h2>Weight</h2>
+    <div class="row">
+      <div>
+        <label for="lb">Pounds</label>
+        <div class="field">
+          <input id="lb" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+          <span class="unit">lb</span>
+        </div>
+      </div>
+      <div>
+        <label for="kg">Kilograms</label>
+        <div class="field">
+          <input id="kg" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+          <span class="unit">kg</span>
+        </div>
+      </div>
+    </div>
+    <p class="hint">Type in either box; the other updates automatically.</p>
+  </section>
+
+  <section data-pages="body energy" data-pages-basis="protein fluid">
+    <h2>Height</h2>
+    <div class="row">
+      <div>
+        <label for="in">Inches</label>
+        <div class="field">
+          <input id="in" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+          <span class="unit">in</span>
+        </div>
+      </div>
+      <div>
+        <label for="cm">Centimeters</label>
+        <div class="field">
+          <input id="cm" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+          <span class="unit">cm</span>
+        </div>
+      </div>
+    </div>
+    <p class="hint">Type in either box; the other updates automatically.</p>
+  </section>
+
+  <section data-pages="energy">
+    <h2>Age</h2>
+    <div class="field">
+      <input id="age" type="number" inputmode="numeric" min="0" step="1" placeholder="0">
+      <span class="unit">years</span>
+    </div>
+  </section>
+
+  <section data-pages="body energy" data-pages-basis="protein fluid">
+    <h2>Sex</h2>
+    <div class="choices">
+      <label>
+        <input type="radio" name="sex" value="male" checked>
+        <span>Male</span>
+      </label>
+      <label>
+        <input type="radio" name="sex" value="female">
+        <span>Female</span>
+      </label>
+    </div>
+  </section>
+
+  <section data-pages="body">
+    <h2>Optimal BMI range</h2>
+    <div class="choices">
+      <label>
+        <input type="radio" name="range" value="20,25" checked>
+        <span>Under 65<small>BMI 20 &ndash; 25</small></span>
+      </label>
+      <label>
+        <input type="radio" name="range" value="25,30">
+        <span>Over 65<small>BMI 25 &ndash; 30</small></span>
+      </label>
+    </div>
+  </section>
+
+  <section data-pages="body" data-pages-basis="energy protein fluid">
+    <h2>Ideal body weight formula</h2>
+    <div class="choices">
+      <label>
+        <input type="radio" name="formula" value="devine" checked>
+        <span>Devine</span>
+      </label>
+      <label>
+        <input type="radio" name="formula" value="hamwi">
+        <span>Hamwi</span>
+      </label>
+    </div>
+  </section>
+
+  <section data-pages="energy protein fluid">
+    <h2>Weight used for the calculation</h2>
+    <div class="choices three">
+      <label>
+        <input type="radio" name="basis" value="actual" checked>
+        <span>Actual</span>
+      </label>
+      <label>
+        <input type="radio" name="basis" value="ideal">
+        <span>Ideal</span>
+      </label>
+      <label>
+        <input type="radio" name="basis" value="adjusted">
+        <span>Adjusted</span>
+      </label>
+    </div>
+  </section>
+
+  <section data-pages="energy">
+    <h2>Activity level</h2>
+    <select id="activity" aria-label="Activity level">
+      <option value="1.2">Sedentary (1.2)</option>
+      <option value="1.375">Lightly active (1.375)</option>
+      <option value="1.55">Moderately active (1.55)</option>
+      <option value="1.725">Very active (1.725)</option>
+    </select>
+  </section>
+
+  <section data-pages="protein">
+    <h2>Protein need</h2>
+    <select id="proteinLevel" aria-label="Protein need">
+      <option value="0.8,1">Healthy adult (0.8&ndash;1.0 g/kg)</option>
+      <option value="1,1.2">Older adult or mild illness (1.0&ndash;1.2 g/kg)</option>
+      <option value="1.2,1.5">Moderate stress or wound healing (1.2&ndash;1.5 g/kg)</option>
+      <option value="1.5,2">Critical illness, burns or major trauma (1.5&ndash;2.0 g/kg)</option>
+    </select>
+  </section>
+
+  <!-- Body results -->
+  <section class="results" data-pages="body">
+    <h2>BMI</h2>
+    <div class="bmi-value" id="bmi">&ndash;</div>
+    <div class="bmi-cat" id="bmiCat">Enter weight and height</div>
+    <div class="target" id="target"></div>
+  </section>
+
+  <section class="results" data-pages="body">
+    <h2 id="ibwTitle">Ideal body weight (Devine)</h2>
+    <div class="bmi-value" id="ibw">&ndash;</div>
+    <div class="bmi-cat" id="ibwRatio"></div>
+    <div class="target" id="ibwRange"></div>
+    <div class="bmi-cat" id="ibwNote">Enter height</div>
+    <div class="target" id="ibwTarget"></div>
+  </section>
+
+  <section class="results" data-pages="body">
+    <h2 id="abwTitle">Adjusted body weight (Devine)</h2>
+    <div class="bmi-value" id="abw">&ndash;</div>
+    <div class="target" id="abwRange"></div>
+    <div class="bmi-cat" id="abwNote">Enter weight and height</div>
+    <p class="hint">Adjusted = ideal + 0.4 &times; (actual &minus; ideal), using the selected formula. Typically used when actual weight is over 120% of ideal.</p>
+  </section>
+
+  <!-- Energy results -->
+  <section class="results" data-pages="energy">
+    <h2>Energy needs</h2>
+    <div class="bmi-value" id="tdee">&ndash;</div>
+    <div class="bmi-cat" id="tdeeNote">Enter weight, height and age</div>
+    <div class="target" id="bmr"></div>
+    <div class="target" id="kcalKg"></div>
+    <div class="target" id="energyBasis"></div>
+    <p class="hint">Daily needs = Mifflin-St Jeor BMR (actual weight) &times; activity level. The weight-based range uses 25&ndash;30 kcal/kg of the weight selected above.</p>
+  </section>
+
+  <!-- Protein results -->
+  <section class="results" data-pages="protein">
+    <h2>Protein needs</h2>
+    <div class="bmi-value" id="protein">&ndash;</div>
+    <div class="bmi-cat" id="proteinNote">Enter weight</div>
+    <div class="target" id="proteinBasis"></div>
+  </section>
+
+  <!-- Fluid results -->
+  <section class="results" data-pages="fluid">
+    <h2>Fluid needs</h2>
+    <div class="bmi-value" id="fluid">&ndash;</div>
+    <div class="bmi-cat" id="fluidNote">Enter weight</div>
+    <div class="target" id="fluidHS"></div>
+    <div class="target" id="fluidBasis"></div>
+    <p class="hint">Main estimate: 30&ndash;35 mL/kg of the weight selected above. The Holliday-Segar method (100 mL/kg for the first 10 kg, 50 mL/kg for the next 10, 20 mL/kg after) uses actual weight.</p>
+  </section>
+
+  <p class="disclaimer">Estimates for education only. Not medical advice.</p>
+</main>
+
+<script>
+  const LB_PER_KG = 2.20462262185;
+  const $ = id => document.getElementById(id);
+  const lb = $('lb'), kg = $('kg'), inch = $('in'), cm = $('cm'), age = $('age');
+
+  // ---- Pages (tabs) ----
+  const PAGES = [
+    { id: 'body', title: 'Body measurements' },
+    { id: 'energy', title: 'Energy needs' },
+    { id: 'protein', title: 'Protein needs' },
+    { id: 'fluid', title: 'Fluid needs' },
+  ];
+  let page = 'body';
+
+  const checked = name => document.querySelector(`input[name="${name}"]:checked`).value;
+
+  function applyPage() {
+    const idx = PAGES.findIndex(p => p.id === page);
+    const needsBody = checked('basis') !== 'actual';
+    document.querySelectorAll('.tab').forEach(t =>
+      t.setAttribute('aria-selected', String(t.dataset.page === page)));
+    $('pageno').textContent = `Page ${idx + 1} of ${PAGES.length}`;
+    $('pageTitle').textContent = PAGES[idx].title;
+    document.title = `${PAGES[idx].title} – Diet Calculator`;
+    document.querySelectorAll('[data-pages]').forEach(el => {
+      const here = el.dataset.pages.split(' ').includes(page);
+      const viaBasis = needsBody && (el.dataset.pagesBasis || '').split(' ').includes(page);
+      el.hidden = !(here || viaBasis);
+    });
+  }
+
+  function goTo(id, step) {
+    if (step) {
+      const idx = PAGES.findIndex(p => p.id === page) + step;
+      if (idx < 0 || idx >= PAGES.length) return;
+      id = PAGES[idx].id;
+    }
+    page = id;
+    history.replaceState(null, '', '#' + id);
+    applyPage();
+    window.scrollTo(0, 0);
+  }
+
+  document.querySelectorAll('.tab').forEach(t =>
+    t.addEventListener('click', () => goTo(t.dataset.page)));
+
+  // Swipe right: next page. Swipe left: previous page.
+  let touch = null;
+  document.addEventListener('touchstart', e => {
+    touch = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (!touch) return;
+    const dx = e.changedTouches[0].clientX - touch.x;
+    const dy = e.changedTouches[0].clientY - touch.y;
+    touch = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) goTo(null, dx > 0 ? 1 : -1);
+  }, { passive: true });
+
+  // ---- Formatting helpers ----
+  // Round to 1 decimal, dropping a trailing ".0"
+  const fmt = n => String(Math.round(n * 10) / 10);
+  const whole = n => Math.round(n).toLocaleString('en-US');
+  const both = kgVal => `${fmt(kgVal * LB_PER_KG)} lb / ${fmt(kgVal)} kg`;
+  const bothRange = (a, b) =>
+    `${fmt(a * LB_PER_KG)}–${fmt(b * LB_PER_KG)} lb / ${fmt(a)}–${fmt(b)} kg`;
+  const span = (a, b, f = whole) => (Math.round(a) === Math.round(b) ? f(a) : `${f(a)}–${f(b)}`);
+
+  // ---- Formulas ----
+  // Ideal body weight in kg for height in inches
+  const FORMULAS = {
+    // men 50 kg + 2.3 kg/in over 5 ft; women 45.5 kg + 2.3 kg/in over 5 ft
+    devine: (inches, male) => (male ? 50 : 45.5) + 2.3 * (inches - 60),
+    // men 106 lb + 6 lb/in over 5 ft; women 100 lb + 5 lb/in over 5 ft
+    hamwi: (inches, male) =>
+      ((male ? 106 : 100) + (male ? 6 : 5) * (inches - 60)) / LB_PER_KG,
+  };
+
+  const bmiBand = (bmi, lo, hi) =>
+    bmi < lo ? 'below selected range' : bmi <= hi ? 'within selected range' : 'above selected range';
+
+  const positive = el => (parseFloat(el.value) > 0 ? parseFloat(el.value) : NaN);
+
+  function update() {
+    const [lo, hi] = checked('range').split(',').map(Number);
+    const male = checked('sex') === 'male';
+    const formula = checked('formula');
+    const basis = checked('basis');
+    const w = positive(kg);
+    const inches = positive(inch);
+    const years = positive(age);
+    const h = inches * 2.54 / 100;
+    const formulaName = formula === 'devine' ? 'Devine' : 'Hamwi';
+    const ibw = Number.isNaN(h) ? NaN : FORMULAS[formula](inches, male);
+    const abw = ibw + 0.4 * (w - ibw); // NaN unless both are known
+
+    // Weight used by the energy, protein and fluid pages
+    const basisKg = { actual: w, ideal: ibw, adjusted: abw }[basis];
+    const basisName = { actual: 'actual', ideal: `ideal (${formulaName})`, adjusted: `adjusted (${formulaName})` }[basis];
+    const basisText = Number.isNaN(basisKg)
+      ? (basis === 'actual' ? 'Enter weight' : 'Enter weight and height')
+      : `Based on ${basisName} weight: ${both(basisKg)}`;
+
+    // BMI
+    $('target').textContent = Number.isNaN(h) ? ''
+      : `Optimal weight for this height: ${bothRange(lo * h * h, hi * h * h)}`;
+    if (Number.isNaN(w) || Number.isNaN(h)) {
+      $('bmi').textContent = '–';
+      $('bmiCat').textContent = 'Enter weight and height';
+    } else {
+      const bmi = w / (h * h);
+      $('bmi').textContent = bmi.toFixed(1);
+      $('bmiCat').textContent =
+        bmi < lo ? 'Underweight for range' :
+        bmi <= hi ? 'Within optimal range' : 'Overweight for range';
+    }
+
+    // Ideal body weight
+    $('ibwTitle').textContent = `Ideal body weight (${formulaName})`;
+    $('abwTitle').textContent = `Adjusted body weight (${formulaName})`;
+    if (Number.isNaN(h)) {
+      for (const id of ['ibwRatio', 'ibwRange', 'ibwTarget', 'abwRange']) $(id).textContent = '';
+      $('ibw').textContent = '–';
+      $('ibwNote').textContent = 'Enter height';
+    } else {
+      $('ibw').textContent = both(ibw);
+      $('ibwRange').textContent = `±10% range: ${bothRange(ibw * 0.9, ibw * 1.1)}`;
+      $('ibwNote').textContent = `BMI ${(ibw / (h * h)).toFixed(1)}: ${bmiBand(ibw / (h * h), lo, hi)}`;
+
+      const goal = Math.min(Math.max(ibw, lo * h * h), hi * h * h);
+      let targetText = `Target within BMI ${lo}–${hi}: ${both(goal)}`;
+      if (!Number.isNaN(w)) {
+        const diff = w - goal;
+        targetText += Math.abs(diff) < 0.05 ? ' (you are at target)' :
+          ` (${fmt(Math.abs(diff) * LB_PER_KG)} lb ${diff > 0 ? 'to lose' : 'to gain'})`;
+      }
+      $('ibwTarget').textContent = targetText;
+    }
+
+    // Actual vs ideal, and adjusted body weight
+    if (Number.isNaN(abw)) {
+      $('ibwRatio').textContent = '';
+      $('abw').textContent = '–';
+      $('abwRange').textContent = '';
+      $('abwNote').textContent = 'Enter weight and height';
+    } else {
+      const ratio = w / ibw;
+      $('ibwRatio').textContent = `Actual weight is ${ratio.toFixed(2)}x ideal (${Math.round(ratio * 100)}%)`;
+      $('abw').textContent = both(abw);
+      $('abwRange').textContent = `±10% range: ${bothRange(abw * 0.9, abw * 1.1)}`;
+      $('abwNote').textContent = ratio > 1.2
+        ? 'Actual weight is over 120% of ideal: adjusted weight applies'
+        : 'Actual weight is 120% of ideal or less: ideal weight is usually used instead';
+    }
+
+    // Energy
+    const hasBmr = !(Number.isNaN(w) || Number.isNaN(h) || Number.isNaN(years));
+    if (hasBmr) {
+      const bmr = 10 * w + 6.25 * h * 100 - 5 * years + (male ? 5 : -161);
+      const activity = parseFloat($('activity').value);
+      $('tdee').textContent = `${whole(bmr * activity)} kcal/day`;
+      $('tdeeNote').textContent = 'Estimated daily energy needs';
+      $('bmr').textContent = `Resting energy (BMR, Mifflin-St Jeor): ${whole(bmr)} kcal/day`;
+    } else {
+      $('tdee').textContent = '–';
+      $('tdeeNote').textContent = 'Enter weight, height and age';
+      $('bmr').textContent = '';
+    }
+    $('kcalKg').textContent = Number.isNaN(basisKg) ? ''
+      : `Weight-based (25–30 kcal/kg): ${whole(25 * basisKg)}–${whole(30 * basisKg)} kcal/day`;
+    $('energyBasis').textContent = basisText;
+
+    // Protein
+    const [pLo, pHi] = $('proteinLevel').value.split(',').map(Number);
+    if (Number.isNaN(basisKg)) {
+      $('protein').textContent = '–';
+      $('proteinNote').textContent = basis === 'actual' ? 'Enter weight' : 'Enter weight and height';
+    } else {
+      $('protein').textContent = `${span(pLo * basisKg, pHi * basisKg)} g/day`;
+      $('proteinNote').textContent = `${pLo === pHi ? pLo : `${pLo}–${pHi}`} g/kg per day`;
+    }
+    $('proteinBasis').textContent = basisText;
+
+    // Fluid
+    if (Number.isNaN(basisKg)) {
+      $('fluid').textContent = '–';
+      $('fluidNote').textContent = basis === 'actual' ? 'Enter weight' : 'Enter weight and height';
+    } else {
+      $('fluid').textContent = `${whole(30 * basisKg)}–${whole(35 * basisKg)} mL/day`;
+      $('fluidNote').textContent = `${fmt(30 * basisKg / 1000)}–${fmt(35 * basisKg / 1000)} L/day (30–35 mL/kg)`;
+    }
+    if (Number.isNaN(w)) {
+      $('fluidHS').textContent = '';
+    } else {
+      const hs = w <= 10 ? 100 * w : w <= 20 ? 1000 + 50 * (w - 10) : 1500 + 20 * (w - 20);
+      $('fluidHS').textContent = `Holliday-Segar (actual weight): ${whole(hs)} mL/day`;
+    }
+    $('fluidBasis').textContent = basisText;
+
+    applyPage();
+  }
+
+  function link(source, target, convert) {
+    source.addEventListener('input', () => {
+      const v = parseFloat(source.value);
+      target.value = Number.isFinite(v) && v >= 0 ? fmt(convert(v)) : '';
+    });
+  }
+
+  link(lb, kg, v => v / LB_PER_KG);
+  link(kg, lb, v => v * LB_PER_KG);
+  link(inch, cm, v => v * 2.54);
+  link(cm, inch, v => v / 2.54);
+
+  // Registered after the link() handlers so paired fields are in sync first
+  [lb, kg, inch, cm, age].forEach(el => el.addEventListener('input', update));
+  document.querySelectorAll('input[type="radio"], select')
+    .forEach(el => el.addEventListener('change', update));
+
+  const fromHash = () => {
+    const id = location.hash.slice(1);
+    if (PAGES.some(p => p.id === id)) page = id;
+    applyPage();
+  };
+  window.addEventListener('hashchange', fromHash);
+  fromHash();
+  update();
+</script>
+</body>
+</html>
