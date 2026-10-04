@@ -10,7 +10,6 @@ Results update as you type. The page is split into five tabs, and the active tab
 | Energy | Mifflin-St Jeor BMR and daily needs by activity level, plus a weight-based estimate with a choice of 19–24, 25–30 or 30–35 kcal/kg |
 | Protein | g/day range from a chosen need level (0.8–2.0 g/kg) |
 | Fluid | a choice of 25–30 or 30–35 mL/kg, plus the Holliday-Segar estimate |
-
 | Tube | Formula presets (Jevity 1.5 Cal, Glucerna 1.5 Cal, Nepro with Carb Steady) or custom, bolus or continuous feeding (continuous requires hours per day and gives an mL/hr rate), a collapsible step-by-step breakdown of the math, formula per feeding from kcal needs and energy density (1.0–2.0 kcal/mL), free water flush before and after each feeding, and the energy, protein and fluid provided each day, as a low–high range |
 
 Energy, protein, fluid and tube feeding can use actual, ideal or adjusted body weight.
