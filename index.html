@@ -124,6 +124,17 @@
   .step { margin-top: 16px; }
   .step b { display: block; }
   .step div { color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
+  .resetbtn {
+    font: inherit;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 20px;
+    cursor: pointer;
+  }
+  .resetbtn:hover, .resetbtn:focus-visible { border-color: var(--accent); outline: none; }
   .disclaimer { color: var(--muted); font-size: .8rem; text-align: center; }
 </style>
 </head>
@@ -469,6 +480,7 @@
     </details>
   </section>
 
+  <p class="disclaimer"><button id="reset" class="resetbtn" type="button">Reset all inputs</button></p>
   <p class="disclaimer">Estimates for education only. Not medical advice.</p>
 </main>
 
@@ -778,6 +790,7 @@
     }
 
     applyPage();
+    save();
   }
 
   function link(source, target, convert) {
@@ -810,6 +823,32 @@
   $('density').addEventListener('change', toCustom);
   $('proteinPerL').addEventListener('input', toCustom);
 
+  // ---- Remember entered values in this browser ----
+  const STORE = 'diet-calc:v1';
+  const fields = [...document.querySelectorAll('input:not([type="radio"]), select')];
+  function save() {
+    try {
+      const data = {};
+      fields.forEach(el => { data[el.id] = el.value; });
+      document.querySelectorAll('input[type="radio"]:checked').forEach(r => { data['radio:' + r.name] = r.value; });
+      localStorage.setItem(STORE, JSON.stringify(data));
+    } catch (e) { /* storage unavailable (private mode, blocked): carry on without saving */ }
+  }
+  function load() {
+    try {
+      const data = JSON.parse(localStorage.getItem(STORE) || '{}');
+      fields.forEach(el => { if (el.id in data) el.value = data[el.id]; });
+      document.querySelectorAll('input[type="radio"]').forEach(r => {
+        if (data['radio:' + r.name] === r.value) r.checked = true;
+      });
+    } catch (e) { /* unreadable saved data: use defaults */ }
+  }
+  $('reset').addEventListener('click', () => {
+    if (!confirm('Clear all inputs on every page and restore the defaults?')) return;
+    try { localStorage.removeItem(STORE); } catch (e) { /* ignore */ }
+    location.reload();
+  });
+
   const fromHash = () => {
     const id = location.hash.slice(1);
     if (PAGES.some(p => p.id === id)) page = id;
@@ -817,6 +856,7 @@
   };
   window.addEventListener('hashchange', fromHash);
   fromHash();
+  load();
   update();
 </script>
 </body>

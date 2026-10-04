@@ -15,4 +15,6 @@ Results update as you type. The page is split into five tabs, and the active tab
 
 Energy, protein, fluid and tube feeding can use actual, ideal or adjusted body weight.
 
+Your entries are saved in your browser (localStorage) and restored on your next visit. The Reset all inputs button at the bottom clears them.
+
 Estimates for education only. Not medical advice.
