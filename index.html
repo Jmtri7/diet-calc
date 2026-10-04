@@ -256,6 +256,24 @@
     </select>
   </section>
 
+  <section data-pages="energy">
+    <h2>Weight-based range</h2>
+    <div class="choices three">
+      <label>
+        <input type="radio" name="kcalrange" value="19,24">
+        <span>19&ndash;24<small>kcal/kg</small></span>
+      </label>
+      <label>
+        <input type="radio" name="kcalrange" value="25,30" checked>
+        <span>25&ndash;30<small>kcal/kg</small></span>
+      </label>
+      <label>
+        <input type="radio" name="kcalrange" value="30,35">
+        <span>30&ndash;35<small>kcal/kg</small></span>
+      </label>
+    </div>
+  </section>
+
   <section data-pages="protein">
     <h2>Protein need</h2>
     <select id="proteinLevel" aria-label="Protein need">
@@ -297,9 +315,14 @@
     <div class="bmi-value" id="tdee">&ndash;</div>
     <div class="bmi-cat" id="tdeeNote">Enter weight, height and age</div>
     <div class="target" id="bmr"></div>
-    <div class="target" id="kcalKg"></div>
+    <p class="hint">Daily needs = Mifflin-St Jeor BMR (actual weight) &times; activity level.</p>
+  </section>
+
+  <section class="results" data-pages="energy">
+    <h2>Energy needs (weight-based)</h2>
+    <div class="bmi-value" id="kcalKg">&ndash;</div>
+    <div class="bmi-cat" id="kcalKgNote">Enter weight</div>
     <div class="target" id="energyBasis"></div>
-    <p class="hint">Daily needs = Mifflin-St Jeor BMR (actual weight) &times; activity level. The weight-based range uses 25&ndash;30 kcal/kg of the weight selected above.</p>
   </section>
 
   <!-- Protein results -->
@@ -491,8 +514,14 @@
       $('tdeeNote').textContent = 'Enter weight, height and age';
       $('bmr').textContent = '';
     }
-    $('kcalKg').textContent = Number.isNaN(basisKg) ? ''
-      : `Weight-based (25–30 kcal/kg): ${whole(25 * basisKg)}–${whole(30 * basisKg)} kcal/day`;
+    const [kLo, kHi] = checked('kcalrange').split(',').map(Number);
+    if (Number.isNaN(basisKg)) {
+      $('kcalKg').textContent = '–';
+      $('kcalKgNote').textContent = basis === 'actual' ? 'Enter weight' : 'Enter weight and height';
+    } else {
+      $('kcalKg').textContent = `${whole(kLo * basisKg)}–${whole(kHi * basisKg)} kcal/day`;
+      $('kcalKgNote').textContent = `${kLo}–${kHi} kcal/kg per day`;
+    }
     $('energyBasis').textContent = basisText;
 
     // Protein
