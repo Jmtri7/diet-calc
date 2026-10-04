@@ -126,6 +126,7 @@
   .target.warn { color: var(--warn); font-weight: 600; }
   .target.ok { color: var(--ok); font-weight: 600; }
   .field + .hint { margin-top: 6px; }
+  .hint.warn { color: var(--warn); font-weight: 600; }
   details summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 4px 0; }
   details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .step { margin-top: 16px; }
@@ -500,7 +501,7 @@
         <p class="hint" id="finalFluidHint"></p>
       </div>
     </div>
-    <p class="hint">Pick a rate and a fluid total from the recommended ranges above to see what the final regimen provides.</p>
+    <p class="hint" id="finalGuide">Pick a rate and a fluid total from the recommended ranges to see what the final regimen provides.</p>
   </section>
 
   <section class="results" data-pages="tube">
@@ -751,6 +752,7 @@
     $('finalRateLabel').textContent = continuous ? 'Final rate' : 'Final volume per feeding';
     $('finalRateUnit').textContent = continuous ? 'mL/hr' : 'mL';
     if (missing) {
+      $('finalGuide').classList.remove('warn');
       $('finalRateHint').textContent = '';
       $('finalFluidHint').textContent = '';
       $('fnRate').textContent = '–';
@@ -833,7 +835,34 @@
       ].join('');
 
       // Final regimen: what the chosen rate and fluid total actually provide
-      $('finalRateHint').textContent = `Recommended: ${rng(a.perFeed, b.perFeed, continuous ? 'mL/hr' : 'mL')}`;
+      // Whole-number rates that meet the energy range, the protein range, and both.
+      // Round inward (up at the low end, down at the high end) so every rate in the range really fits.
+      const rateUnit = continuous ? 'mL/hr' : 'mL';
+      const inward = (loMl, hiMl) => [Math.ceil(loMl / units - 1e-9), Math.floor(hiMl / units + 1e-9)];
+      let eRate = inward(kLo * basisKg / density, kHi * basisKg / density);
+      if (eRate[0] > eRate[1]) eRate = [a.perFeed, b.perFeed];
+      const pRate = Number.isNaN(gPerL) ? null
+        : inward(pLo * basisKg * 1000 / gPerL, pHi * basisKg * 1000 / gPerL);
+      const bothLo = pRate ? Math.max(eRate[0], pRate[0]) : eRate[0];
+      const bothHi = pRate ? Math.min(eRate[1], pRate[1]) : eRate[1];
+      const fits = bothLo <= bothHi;
+      const guide = $('finalGuide');
+      guide.classList.toggle('warn', !fits);
+      if (!pRate) {
+        $('finalRateHint').textContent = `Recommended: ${rng(eRate[0], eRate[1], rateUnit)} (energy only)`;
+        guide.textContent = 'Enter grams of protein per liter to also check protein. Pick a rate and a fluid total from the recommended ranges.';
+      } else if (fits) {
+        $('finalRateHint').textContent = `Recommended: ${rng(bothLo, bothHi, rateUnit)} (energy and protein)`;
+        guide.textContent = 'Any rate in the recommended range meets both the energy and the protein need. Pick a fluid total from its range too.';
+      } else {
+        $('finalRateHint').textContent = `Energy range: ${rng(eRate[0], eRate[1], rateUnit)}`;
+        const name = $('product').value ? $('product').selectedOptions[0].text.replace(/ \(.*\)$/, '') : 'This formula';
+        const fix = pRate[0] > eRate[1]
+          ? `Reaching the protein need would take about ${whole(Math.ceil(pLo * 1000 / gPerL * density))} kcal/kg (the energy range is ${kLo}–${kHi})`
+          : `Staying within the protein need would take no more than about ${whole(Math.floor(pHi * 1000 / gPerL * density))} kcal/kg (the energy range is ${kLo}–${kHi})`;
+        guide.textContent = `${name} can't meet both needs at once: energy needs ${rng(eRate[0], eRate[1], rateUnit)} but protein needs ${rng(pRate[0], pRate[1], rateUnit)}. ` +
+          `${fix}, so consider a different formula or a protein modular. Showing the energy range; protein will be ${pRate[0] > eRate[1] ? 'below' : 'above'} the need.`;
+      }
       $('finalFluidHint').textContent = `Recommended: ${rng(a.desired, b.desired, 'mL')}`;
       const finalRate = positive($('finalRate'));
       const finalFluid = positive($('finalFluid'));
