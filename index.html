@@ -764,29 +764,44 @@
       $('tfFlush').textContent = '–';
       $('tfFeedNote').textContent = missing;
     } else {
-      const calc = (kcalPerKg, mlPerKg) => {
-        const perFeed = Math.round(kcalPerKg * basisKg / density / units); // mL per feeding, or per hour
-        const volume = perFeed * units; // mL formula per day
+      const rng = (x, y, unit, f = whole) => `${span(x, y, f)} ${unit}`;
+      const rateUnit = continuous ? 'mL/hr' : 'mL';
+      const flushWhen = continuous ? `every ${fmt(flushEvery)} h` : 'before and after each feeding';
+
+      // Whole-number rates that meet the energy range, the protein range, and both.
+      // Round inward (up at the low end, down at the high end) so every rate in the range really fits.
+      const inward = (loMl, hiMl) => [Math.ceil(loMl / units - 1e-9), Math.floor(hiMl / units + 1e-9)];
+      const eMl = [kLo * basisKg / density, kHi * basisKg / density];
+      let eRate = inward(eMl[0], eMl[1]);
+      if (eRate[0] > eRate[1]) eRate = [Math.round(eMl[0] / units), Math.round(eMl[1] / units)];
+      const pMl = Number.isNaN(gPerL) ? null : [pLo * basisKg * 1000 / gPerL, pHi * basisKg * 1000 / gPerL];
+      const pRate = pMl && inward(pMl[0], pMl[1]);
+      const bothLo = pRate ? Math.max(eRate[0], pRate[0]) : eRate[0];
+      const bothHi = pRate ? Math.min(eRate[1], pRate[1]) : eRate[1];
+      const fits = bothLo <= bothHi;
+      const recRate = fits ? [bothLo, bothHi] : eRate; // recommended formula rate range
+
+      // What a given formula rate provides, paired with the matching end of the fluid range
+      const calc = (rate, mlPerKg) => {
+        const volume = rate * units; // mL formula per day
         const fluidIn = volume * waterPct / 100;
-        const flush = Math.max(0, Math.round((mlPerKg * basisKg - fluidIn) / flushes));
-        const kcalNeed = kcalPerKg * basisKg;
         const desired = mlPerKg * basisKg;
+        const flush = Math.max(0, Math.round((desired - fluidIn) / flushes));
         return {
-          perFeed, volume, fluidIn, flush, kcalNeed, desired,
-          mlRaw: kcalNeed / density,
+          rate, volume, fluidIn, flush, desired,
           free: desired - fluidIn,
           kcal: volume * density,
           protein: Number.isNaN(gPerL) ? NaN : volume / 1000 * gPerL,
           total: fluidIn + flush * flushes,
         };
       };
-      const a = calc(kLo, mLo), b = calc(kHi, mHi);
-      const rng = (x, y, unit, f = whole) => `${span(x, y, f)} ${unit}`;
-      const flushWhen = continuous ? `every ${fmt(flushEvery)} h` : 'before and after each feeding';
-      $('tfFeed').textContent = rng(a.perFeed, b.perFeed, continuous ? 'mL/hr' : 'mL');
-      $('tfFeedNote').textContent = continuous
-        ? `continuous over ${fmt(hours)} hours per day`
-        : `${feeds} feeding${feeds === 1 ? '' : 's'} per day`;
+      const a = calc(recRate[0], mLo), b = calc(recRate[1], mHi);
+
+      $('tfTitle').textContent = continuous ? 'Recommended formula rate' : 'Recommended formula per feeding';
+      $('tfFeed').textContent = rng(a.rate, b.rate, rateUnit);
+      $('tfFeedNote').textContent =
+        (continuous ? `over ${fmt(hours)} hours per day` : `${feeds} feeding${feeds === 1 ? '' : 's'} per day`) +
+        (!pRate ? ' · energy only' : fits ? ' · meets energy and protein' : ' · energy only (protein can’t also be met)');
       $('tfVolume').textContent =
         `Formula per day: ${rng(a.volume, b.volume, 'mL')} (${span(a.volume / 1000, b.volume / 1000, fmt)} L) of ${density.toFixed(1)} kcal/mL`;
       $('tfFlush').textContent = a.flush === 0 && b.flush === 0 ? 'None needed' : rng(a.flush, b.flush, 'mL');
@@ -805,47 +820,51 @@
       $('tfSummary').textContent =
         `Regimen: ${density.toFixed(1)} kcal/mL formula, ` +
         (continuous
-          ? `${rng(a.perFeed, b.perFeed, 'mL/hr')} continuously for ${fmt(hours)} hours per day`
-          : `${rng(a.perFeed, b.perFeed, 'mL')} per feeding, ${feeds} time${feeds === 1 ? '' : 's'} per day`) +
+          ? `${rng(a.rate, b.rate, 'mL/hr')} continuously for ${fmt(hours)} hours per day`
+          : `${rng(a.rate, b.rate, 'mL')} per feeding, ${feeds} time${feeds === 1 ? '' : 's'} per day`) +
         (a.flush === 0 && b.flush === 0 ? '.' : `, flushing with ${rng(a.flush, b.flush, 'mL')} water ${flushWhen}.`);
 
       // Step-by-step breakdown (low end of each range, then high end)
       const w = fmt(basisKg);
       const liters = mL => String(Math.round(mL) / 1000);
+      const dec2 = x => String(Math.round(x * 100) / 100);
       const unitName = continuous ? 'hours' : 'feedings';
-      const perName = continuous ? 'mL per hour' : 'mL per feeding';
       const flushDiv = continuous
         ? `${flushes} flushes (${fmt(hours)} h pump time ÷ ${fmt(flushEvery)} h, rounded)`
         : `${flushes} flushes (${feeds} feedings × 2)`;
+      const kk = [kLo, kHi], mm = [mLo, mHi], pp = [pLo, pHi];
+      let n = 0;
       const step = (title, f) =>
-        `<div class="step"><b>${title}</b><div>Low: ${f(a, kLo, mLo)}</div><div>High: ${f(b, kHi, mHi)}</div></div>`;
-      stepsEl.innerHTML = [
-        step('1. Energy needed (kcal/kg × weight)', (r, k) => `${k} × ${w} kg = ${whole(r.kcalNeed)} kcal`),
-        step('2. Formula needed (kcal ÷ energy density)', r => `${whole(r.kcalNeed)} ÷ ${density.toFixed(1)} = ${whole(r.mlRaw)} mL/day`),
-        step(`3. Divide by ${unitName}, round to nearest mL`, r => `${whole(r.mlRaw)} ÷ ${fmt(units)} = ${whole(r.perFeed)} ${perName}`),
-        step('4. Formula per day after rounding', r => `${whole(r.perFeed)} × ${fmt(units)} = ${whole(r.volume)} mL (${liters(r.volume)} L)`),
-        step('5. Energy provided (volume × density)', r => `${whole(r.volume)} × ${density.toFixed(1)} = ${whole(r.kcal)} kcal`),
-        step('6. Protein provided (liters × g/L)', r => Number.isNaN(gPerL) ? 'Enter grams per liter'
+        `<div class="step"><b>${++n}. ${title}</b><div>Low: ${f(a, 0)}</div><div>High: ${f(b, 1)}</div></div>`;
+      const steps = [
+        step('Energy needed (kcal/kg × weight)', (r, i) => `${kk[i]} × ${w} kg = ${whole(kk[i] * basisKg)} kcal`),
+        step(`Rate that meets energy (kcal ÷ density ÷ ${unitName}; low end rounded up, high end down)`,
+          (r, i) => `${whole(kk[i] * basisKg)} ÷ ${density.toFixed(1)} ÷ ${fmt(units)} = ${dec2(eMl[i] / units)} → ${whole(eRate[i])} ${rateUnit}`),
+      ];
+      if (pMl) {
+        steps.push(
+          step('Protein needed (g/kg × weight)', (r, i) => `${pp[i]} × ${w} kg = ${fmt(pp[i] * basisKg)} g`),
+          step(`Rate that meets protein (g ÷ g/L × 1000 ÷ ${unitName})`,
+            (r, i) => `${fmt(pp[i] * basisKg)} ÷ ${fmt(gPerL)} × 1000 ÷ ${fmt(units)} = ${dec2(pMl[i] / units)} → ${whole(pRate[i])} ${rateUnit}`),
+          step('Recommended rate (higher of the low ends, lower of the high ends)',
+            (r, i) => fits ? `${i === 0 ? 'max' : 'min'}(${whole(eRate[i])}, ${whole(pRate[i])}) = ${whole(recRate[i])} ${rateUnit}`
+              : `${whole(eRate[i])} ${rateUnit} (no overlap, so the energy range is used)`),
+        );
+      }
+      steps.push(
+        step(`Formula per day (rate × ${unitName})`, r => `${whole(r.rate)} × ${fmt(units)} = ${whole(r.volume)} mL (${liters(r.volume)} L)`),
+        step('Energy provided (volume × density)', r => `${whole(r.volume)} × ${density.toFixed(1)} = ${whole(r.kcal)} kcal`),
+        step('Protein provided (liters × g/L)', r => Number.isNaN(gPerL) ? 'Enter grams per liter'
           : `${liters(r.volume)} L × ${fmt(gPerL)} g/L = ${fmt(r.protein)} g`),
-        step('7. Fluid in formula (volume × % water × 0.01)', r => `${whole(r.volume)} × ${(waterPct / 100).toFixed(2)} = ${whole(r.fluidIn)} mL`),
-        step('8. Desired fluid (mL/kg × weight)', (r, k, m) => `${m} × ${w} kg = ${whole(r.desired)} mL`),
-        step('9. Free water still needed (desired − formula fluid)', r => `${whole(r.desired)} − ${whole(r.fluidIn)} = ${whole(Math.max(0, r.free))} mL`),
-        step(`10. Flush volume (÷ ${flushDiv})`, r => `${whole(Math.max(0, r.free))} ÷ ${flushes} = ${whole(r.flush)} mL`),
-        step('11. Total fluid (formula + flushes)', r => `${whole(r.fluidIn)} + ${whole(r.flush)} × ${flushes} = ${whole(r.total)} mL`),
-      ].join('');
+        step('Fluid in formula (volume × % water × 0.01)', r => `${whole(r.volume)} × ${(waterPct / 100).toFixed(2)} = ${whole(r.fluidIn)} mL`),
+        step('Desired fluid (mL/kg × weight)', (r, i) => `${mm[i]} × ${w} kg = ${whole(r.desired)} mL`),
+        step('Free water still needed (desired − formula fluid)', r => `${whole(r.desired)} − ${whole(r.fluidIn)} = ${whole(Math.max(0, r.free))} mL`),
+        step(`Flush volume (÷ ${flushDiv})`, r => `${whole(Math.max(0, r.free))} ÷ ${flushes} = ${whole(r.flush)} mL`),
+        step('Total fluid (formula + flushes)', r => `${whole(r.fluidIn)} + ${whole(r.flush)} × ${flushes} = ${whole(r.total)} mL`),
+      );
+      stepsEl.innerHTML = steps.join('');
 
       // Final regimen: what the chosen rate and fluid total actually provide
-      // Whole-number rates that meet the energy range, the protein range, and both.
-      // Round inward (up at the low end, down at the high end) so every rate in the range really fits.
-      const rateUnit = continuous ? 'mL/hr' : 'mL';
-      const inward = (loMl, hiMl) => [Math.ceil(loMl / units - 1e-9), Math.floor(hiMl / units + 1e-9)];
-      let eRate = inward(kLo * basisKg / density, kHi * basisKg / density);
-      if (eRate[0] > eRate[1]) eRate = [a.perFeed, b.perFeed];
-      const pRate = Number.isNaN(gPerL) ? null
-        : inward(pLo * basisKg * 1000 / gPerL, pHi * basisKg * 1000 / gPerL);
-      const bothLo = pRate ? Math.max(eRate[0], pRate[0]) : eRate[0];
-      const bothHi = pRate ? Math.min(eRate[1], pRate[1]) : eRate[1];
-      const fits = bothLo <= bothHi;
       const guide = $('finalGuide');
       guide.classList.toggle('warn', !fits);
       if (!pRate) {
