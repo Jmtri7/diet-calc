@@ -9,7 +9,7 @@ Results update as you type. The page is split into four tabs, and the active tab
 | Body | lb/kg and in/cm conversion, BMI against a chosen optimal range, ideal body weight (Devine or Hamwi) with ±10% range and target, actual vs ideal ratio, adjusted body weight with ±10% range |
 | Energy | Mifflin-St Jeor BMR and daily needs by activity level, plus a weight-based estimate with a choice of 19–24, 25–30 or 30–35 kcal/kg |
 | Protein | g/day range from a chosen need level (0.8–2.0 g/kg) |
-| Fluid | 30–35 mL/kg and Holliday-Segar estimates |
+| Fluid | a choice of 25–30 or 30–35 mL/kg, plus the Holliday-Segar estimate |
 
 Energy, protein and fluid can use actual, ideal or adjusted body weight.
 

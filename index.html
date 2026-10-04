@@ -274,6 +274,20 @@
     </div>
   </section>
 
+  <section data-pages="fluid">
+    <h2>Fluid range</h2>
+    <div class="choices">
+      <label>
+        <input type="radio" name="mlrange" value="25,30">
+        <span>25&ndash;30<small>mL/kg</small></span>
+      </label>
+      <label>
+        <input type="radio" name="mlrange" value="30,35" checked>
+        <span>30&ndash;35<small>mL/kg</small></span>
+      </label>
+    </div>
+  </section>
+
   <section data-pages="protein">
     <h2>Protein need</h2>
     <select id="proteinLevel" aria-label="Protein need">
@@ -340,7 +354,7 @@
     <div class="bmi-cat" id="fluidNote">Enter weight</div>
     <div class="target" id="fluidHS"></div>
     <div class="target" id="fluidBasis"></div>
-    <p class="hint">Main estimate: 30&ndash;35 mL/kg of the weight selected above. The Holliday-Segar method (100 mL/kg for the first 10 kg, 50 mL/kg for the next 10, 20 mL/kg after) uses actual weight.</p>
+    <p class="hint">Main estimate: the mL/kg range selected above, applied to the selected weight. The Holliday-Segar method (100 mL/kg for the first 10 kg, 50 mL/kg for the next 10, 20 mL/kg after) uses actual weight.</p>
   </section>
 
   <p class="disclaimer">Estimates for education only. Not medical advice.</p>
@@ -536,12 +550,13 @@
     $('proteinBasis').textContent = basisText;
 
     // Fluid
+    const [mLo, mHi] = checked('mlrange').split(',').map(Number);
     if (Number.isNaN(basisKg)) {
       $('fluid').textContent = '–';
       $('fluidNote').textContent = basis === 'actual' ? 'Enter weight' : 'Enter weight and height';
     } else {
-      $('fluid').textContent = `${whole(30 * basisKg)}–${whole(35 * basisKg)} mL/day`;
-      $('fluidNote').textContent = `${fmt(30 * basisKg / 1000)}–${fmt(35 * basisKg / 1000)} L/day (30–35 mL/kg)`;
+      $('fluid').textContent = `${whole(mLo * basisKg)}–${whole(mHi * basisKg)} mL/day`;
+      $('fluidNote').textContent = `${fmt(mLo * basisKg / 1000)}–${fmt(mHi * basisKg / 1000)} L/day (${mLo}–${mHi} mL/kg)`;
     }
     if (Number.isNaN(w)) {
       $('fluidHS').textContent = '';
