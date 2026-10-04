@@ -13,9 +13,13 @@
     --border: #d5dce4;
     --accent: #2563eb;
     --result-bg: #eef4ff;
+    --warn: #b45309;
+    --ok: #15803d;
   }
   @media (prefers-color-scheme: dark) {
     :root {
+      --warn: #f5b04c;
+      --ok: #5fd08a;
       --bg: #12161c;
       --card: #1b212a;
       --text: #e8edf3;
@@ -119,6 +123,9 @@
   .choices input:checked + span { border-color: var(--accent); background: var(--result-bg); }
   .choices input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
   .target { margin-top: 12px; color: var(--muted); }
+  .target.warn { color: var(--warn); font-weight: 600; }
+  .target.ok { color: var(--ok); font-weight: 600; }
+  .field + .hint { margin-top: 6px; }
   details summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 4px 0; }
   details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .step { margin-top: 16px; }
@@ -474,6 +481,36 @@
   </section>
 
   <section data-pages="tube">
+    <h2>Final choices</h2>
+    <div class="row">
+      <div>
+        <label for="finalRate" id="finalRateLabel">Final rate</label>
+        <div class="field">
+          <input id="finalRate" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+          <span class="unit" id="finalRateUnit">mL/hr</span>
+        </div>
+        <p class="hint" id="finalRateHint"></p>
+      </div>
+      <div>
+        <label for="finalFluid">Final total fluid</label>
+        <div class="field">
+          <input id="finalFluid" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+          <span class="unit">mL/day</span>
+        </div>
+        <p class="hint" id="finalFluidHint"></p>
+      </div>
+    </div>
+    <p class="hint">Pick a rate and a fluid total from the recommended ranges above to see what the final regimen provides.</p>
+  </section>
+
+  <section class="results" data-pages="tube">
+    <h2>Final regimen</h2>
+    <div class="bmi-value" id="fnRate">&ndash;</div>
+    <div class="bmi-cat" id="fnNote">Enter a final rate</div>
+    <div id="fnLines"></div>
+  </section>
+
+  <section data-pages="tube">
     <details>
       <summary>Show calculation breakdown</summary>
       <div id="tfSteps"><p class="hint">Enter the inputs above to see the steps.</p></div>
@@ -711,7 +748,14 @@
     $('tfBasis').textContent = basisText;
     $('tfTitle').textContent = continuous ? 'Formula rate' : 'Formula per feeding';
     const stepsEl = $('tfSteps');
+    $('finalRateLabel').textContent = continuous ? 'Final rate' : 'Final volume per feeding';
+    $('finalRateUnit').textContent = continuous ? 'mL/hr' : 'mL';
     if (missing) {
+      $('finalRateHint').textContent = '';
+      $('finalFluidHint').textContent = '';
+      $('fnRate').textContent = '–';
+      $('fnNote').textContent = missing;
+      $('fnLines').innerHTML = '';
       stepsEl.innerHTML = '<p class="hint">Enter the inputs above to see the steps.</p>';
       for (const id of tf) $(id).textContent = '';
       $('tfFeed').textContent = '–';
@@ -787,6 +831,74 @@
         step(`10. Flush volume (÷ ${flushDiv})`, r => `${whole(Math.max(0, r.free))} ÷ ${flushes} = ${whole(r.flush)} mL`),
         step('11. Total fluid (formula + flushes)', r => `${whole(r.fluidIn)} + ${whole(r.flush)} × ${flushes} = ${whole(r.total)} mL`),
       ].join('');
+
+      // Final regimen: what the chosen rate and fluid total actually provide
+      $('finalRateHint').textContent = `Recommended: ${rng(a.perFeed, b.perFeed, continuous ? 'mL/hr' : 'mL')}`;
+      $('finalFluidHint').textContent = `Recommended: ${rng(a.desired, b.desired, 'mL')}`;
+      const finalRate = positive($('finalRate'));
+      const finalFluid = positive($('finalFluid'));
+      if (Number.isNaN(finalRate)) {
+        $('fnRate').textContent = '–';
+        $('fnNote').textContent = continuous ? 'Enter a final rate (mL/hr)' : 'Enter a final volume per feeding (mL)';
+        $('fnLines').innerHTML = '';
+      } else {
+        const volume = finalRate * units; // mL formula per day
+        const fluidIn = volume * waterPct / 100;
+        const kcal = volume * density;
+        const protein = Number.isNaN(gPerL) ? NaN : volume / 1000 * gPerL;
+        const lines = [];
+        const warnings = [];
+        // Compare a final value with its recommended range (ends rounded the way they are shown)
+        const check = (label, val, lo, hi, unit) => {
+          const v = Math.round(val), l = Math.round(lo), h = Math.round(hi);
+          const state = v < l ? 'below' : v > h ? 'above' : 'within';
+          if (state !== 'within') warnings.push(`${label} is ${state} the recommended range`);
+          return `${state === 'within' ? '✓' : '⚠'} ${state} the need of ${rng(lo, hi, unit)}`;
+        };
+        const line = (text, cls = '') => lines.push(`<div class="target ${cls}">${text}</div>`);
+
+        $('fnRate').textContent = continuous ? `${fmt(finalRate)} mL/hr` : `${fmt(finalRate)} mL per feeding`;
+        $('fnNote').textContent = continuous
+          ? `for ${fmt(hours)} hours per day`
+          : `${feeds} feeding${feeds === 1 ? '' : 's'} per day`;
+        line(`Formula per day: ${whole(volume)} mL (${liters(volume)} L)`);
+        line(`Energy: ${whole(kcal)} kcal (${fmt(kcal / basisKg)} kcal/kg), ` +
+          check('Energy', kcal, kLo * basisKg, kHi * basisKg, 'kcal'));
+        line(Number.isNaN(protein) ? 'Protein: enter grams per liter'
+          : `Protein: ${fmt(protein)} g (${(protein / basisKg).toFixed(2)} g/kg), ` +
+            check('Protein', protein, pLo * basisKg, pHi * basisKg, 'g'));
+        line(`Fluid from formula: ${whole(fluidIn)} mL (${waterPct}% water)`);
+
+        let summaryFlush = '';
+        if (Number.isNaN(finalFluid)) {
+          line('Free water flush: enter a final total fluid');
+        } else {
+          const free = Math.max(0, finalFluid - fluidIn);
+          const flush = Math.round(free / flushes);
+          const total = fluidIn + flush * flushes;
+          line(`Free water needed: ${whole(free)} mL`);
+          line(flush === 0
+            ? 'Flush: none needed (the formula alone provides the chosen fluid total)'
+            : `Flush: ${whole(flush)} mL ${flushWhen} (${flushes} flushes per day)`);
+          line(`Total fluid: ${whole(total)} mL (${fmt(total / basisKg)} mL/kg), ` +
+            check('Total fluid', total, mLo * basisKg, mHi * basisKg, 'mL'));
+          if (flush > 0) summaryFlush = `, flushing with ${whole(flush)} mL water ${flushWhen}`;
+        }
+
+        for (const w of warnings) line(`⚠ Warning: ${w}`, 'warn');
+        if (!warnings.length && !Number.isNaN(protein) && !Number.isNaN(finalFluid)) {
+          line('✓ Energy, protein and fluid are all within the recommended ranges', 'ok');
+        }
+
+        const productName = $('product').value
+          ? $('product').selectedOptions[0].text.replace(/ \(.*\)$/, '')
+          : `${density.toFixed(1)} kcal/mL formula`;
+        line(`Regimen: ${productName}, ` +
+          (continuous
+            ? `${fmt(finalRate)} mL/hr for ${fmt(hours)} hours per day`
+            : `${fmt(finalRate)} mL ${feeds} time${feeds === 1 ? '' : 's'} per day`) + summaryFlush + '.');
+        $('fnLines').innerHTML = lines.join('');
+      }
     }
 
     applyPage();
@@ -806,7 +918,7 @@
   link(cm, inch, v => v / 2.54);
 
   // Registered after the link() handlers so paired fields are in sync first
-  [lb, kg, inch, cm, age, $('proteinPerL'), $('feeds'), $('hours'), $('flushEvery')].forEach(el => el.addEventListener('input', update));
+  [lb, kg, inch, cm, age, $('proteinPerL'), $('feeds'), $('hours'), $('flushEvery'), $('finalRate'), $('finalFluid')].forEach(el => el.addEventListener('input', update));
   document.querySelectorAll('input[type="radio"], select:not(#product)')
     .forEach(el => el.addEventListener('change', update));
 
