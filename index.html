@@ -300,6 +300,17 @@
   </section>
 
   <section data-pages="tube">
+    <h2>Formula product</h2>
+    <select id="product" aria-label="Formula product">
+      <option value="">Custom (enter below)</option>
+      <option value="1.5,63.8">Jevity 1.5 Cal (63.8 g/L)</option>
+      <option value="1.5,82.7">Glucerna 1.5 Cal (82.7 g/L)</option>
+      <option value="1.8,81">Nepro with Carb Steady (81 g/L)</option>
+    </select>
+    <p class="hint">Ready-to-hang 1000 mL values from the product labels. Picking one fills in the energy density and protein below.</p>
+  </section>
+
+  <section data-pages="tube">
     <h2>Formula energy density</h2>
     <select id="density" aria-label="Formula energy density">
       <option value="1.0">1.0 kcal/mL (84% water)</option>
@@ -328,7 +339,7 @@
         </div>
       </div>
     </div>
-    <p class="hint">Check the formula label for grams of protein per liter. The 60 g/L shown is only a placeholder.</p>
+    <p class="hint">For a formula not listed, enter grams of protein per liter from its label. The 60 g/L shown is only a placeholder.</p>
   </section>
 
   <!-- Body results -->
@@ -694,8 +705,21 @@
 
   // Registered after the link() handlers so paired fields are in sync first
   [lb, kg, inch, cm, age, $('proteinPerL'), $('feeds')].forEach(el => el.addEventListener('input', update));
-  document.querySelectorAll('input[type="radio"], select')
+  document.querySelectorAll('input[type="radio"], select:not(#product)')
     .forEach(el => el.addEventListener('change', update));
+
+  // A product preset fills in density and protein; editing either by hand returns to Custom
+  $('product').addEventListener('change', () => {
+    if ($('product').value) {
+      const [d, p] = $('product').value.split(',');
+      $('density').value = Number(d).toFixed(1);
+      $('proteinPerL').value = p;
+    }
+    update();
+  });
+  const toCustom = () => { $('product').value = ''; };
+  $('density').addEventListener('change', toCustom);
+  $('proteinPerL').addEventListener('input', toCustom);
 
   const fromHash = () => {
     const id = location.hash.slice(1);
