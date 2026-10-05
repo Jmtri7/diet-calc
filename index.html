@@ -136,6 +136,15 @@
   .ptable td { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ptable td.ok { color: var(--ok); font-weight: 600; }
   .ptable td.warn { color: var(--warn); font-weight: 600; }
+  .ptable .st { font-weight: 700; }
+  .ptable .st.ok { color: var(--ok); }
+  .ptable .st.warn { color: var(--warn); }
+  #tfTable, #fnLines { overflow-x: auto; }
+  @media (max-width: 480px) {
+    section { padding: 16px; }
+    .ptable { font-size: .85rem; }
+    .ptable th, .ptable td { padding: 7px 3px; }
+  }
   .ptable small { display: block; color: var(--muted); font-weight: 400; }
   .mini {
     max-width: 640px;
@@ -888,8 +897,9 @@
       const inRange = (v1, v2, lo, hi, tol = 0) =>
         (Math.round(v1) >= Math.round(lo * (1 - tol)) && Math.round(v2) <= Math.round(hi * (1 + tol)) ? 'ok' : 'warn');
       const ptable = rows => '<table class="ptable"><thead><tr><th></th><th>Provided</th><th>Need</th></tr></thead><tbody>' +
-        rows.map(r => `<tr><th scope="row">${r.label}</th><td class="${r.state || ''}">` +
-          `${r.state === 'warn' ? '⚠ ' : r.state === 'ok' ? '✓ ' : ''}${r.value}${r.sub ? `<small>${r.sub}</small>` : ''}</td>` +
+        rows.map(r => `<tr><th scope="row">${r.label}` +
+          `${r.state === 'warn' ? ' <span class="st warn" title="Outside the need">⚠</span>' : r.state === 'ok' ? ' <span class="st ok" title="Within the need">✓</span>' : ''}</th>` +
+          `<td class="${r.state || ''}">${r.value}${r.sub ? `<small>${r.sub}</small>` : ''}</td>` +
           `<td>${r.need || '–'}</td></tr>`).join('') + '</tbody></table>';
       const eNeed = [kLo * basisKg, kHi * basisKg], pNeed = [pLo * basisKg, pHi * basisKg], fNeed = [mLo * basisKg, mHi * basisKg];
       $('tfTable').innerHTML = ptable([
