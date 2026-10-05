@@ -126,6 +126,8 @@
   .target.warn { color: var(--warn); font-weight: 600; }
   .target.ok { color: var(--ok); font-weight: 600; }
   .field + .hint { margin-top: 6px; }
+  .biglabel { color: var(--muted); font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 2px; }
+  .biglabel:first-of-type { margin-top: 0; }
   .hint.warn { color: var(--warn); font-weight: 600; }
   details summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 4px 0; }
   details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -506,8 +508,12 @@
 
   <section class="results" data-pages="tube">
     <h2>Final regimen</h2>
+    <div class="biglabel" id="fnRateLabel">Formula rate</div>
     <div class="bmi-value" id="fnRate">&ndash;</div>
     <div class="bmi-cat" id="fnNote">Enter a final rate</div>
+    <div class="biglabel">Free water flush</div>
+    <div class="bmi-value" id="fnFlush">&ndash;</div>
+    <div class="bmi-cat" id="fnFlushNote">Enter a final total fluid</div>
     <div id="fnLines"></div>
   </section>
 
@@ -757,6 +763,8 @@
       $('finalFluidHint').textContent = '';
       $('fnRate').textContent = '–';
       $('fnNote').textContent = missing;
+      $('fnFlush').textContent = '–';
+      $('fnFlushNote').textContent = '';
       $('fnLines').innerHTML = '';
       stepsEl.innerHTML = '<p class="hint">Enter the inputs above to see the steps.</p>';
       for (const id of tf) $(id).textContent = '';
@@ -885,9 +893,12 @@
       $('finalFluidHint').textContent = `Recommended: ${rng(a.desired, b.desired, 'mL')}`;
       const finalRate = positive($('finalRate'));
       const finalFluid = positive($('finalFluid'));
+      $('fnRateLabel').textContent = continuous ? 'Formula rate' : 'Formula per feeding';
       if (Number.isNaN(finalRate)) {
         $('fnRate').textContent = '–';
         $('fnNote').textContent = continuous ? 'Enter a final rate (mL/hr)' : 'Enter a final volume per feeding (mL)';
+        $('fnFlush').textContent = '–';
+        $('fnFlushNote').textContent = 'Enter a final rate and total fluid';
         $('fnLines').innerHTML = '';
       } else {
         const volume = finalRate * units; // mL formula per day
@@ -919,15 +930,17 @@
 
         let summaryFlush = '';
         if (Number.isNaN(finalFluid)) {
-          line('Free water flush: enter a final total fluid');
+          $('fnFlush').textContent = '–';
+          $('fnFlushNote').textContent = 'Enter a final total fluid';
         } else {
           const free = Math.max(0, finalFluid - fluidIn);
           const flush = Math.round(free / flushes);
           const total = fluidIn + flush * flushes;
           line(`Free water needed: ${whole(free)} mL`);
-          line(flush === 0
-            ? 'Flush: none needed (the formula alone provides the chosen fluid total)'
-            : `Flush: ${whole(flush)} mL ${flushWhen} (${flushes} flushes per day)`);
+          $('fnFlush').textContent = flush === 0 ? 'None needed' : `${whole(flush)} mL`;
+          $('fnFlushNote').textContent = flush === 0
+            ? 'the formula alone provides the chosen fluid total'
+            : `water ${flushWhen} (${flushes} flushes per day)`;
           line(`Total fluid: ${whole(total)} mL (${fmt(total / basisKg)} mL/kg), ` +
             check('Total fluid', total, mLo * basisKg, mHi * basisKg, 'mL'));
           if (flush > 0) summaryFlush = `, flushing with ${whole(flush)} mL water ${flushWhen}`;
