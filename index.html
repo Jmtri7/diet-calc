@@ -468,6 +468,12 @@
   </section>
 
   <section class="results" data-pages="tube">
+    <h2>Recommended total fluid</h2>
+    <div class="bmi-value" id="tfFluidRec">&ndash;</div>
+    <div class="bmi-cat" id="tfFluidRecNote"></div>
+  </section>
+
+  <section class="results" data-pages="tube">
     <h2>Free water flush</h2>
     <div class="bmi-value" id="tfFlush">&ndash;</div>
     <div class="bmi-cat" id="tfFlushNote"></div>
@@ -769,6 +775,8 @@
       stepsEl.innerHTML = '<p class="hint">Enter the inputs above to see the steps.</p>';
       for (const id of tf) $(id).textContent = '';
       $('tfFeed').textContent = '–';
+      $('tfFluidRec').textContent = '–';
+      $('tfFluidRecNote').textContent = '';
       $('tfFlush').textContent = '–';
       $('tfFeedNote').textContent = missing;
     } else {
@@ -812,6 +820,8 @@
         (!pRate ? ' · energy only' : fits ? ' · meets energy and protein' : ' · energy only (protein can’t also be met)');
       $('tfVolume').textContent =
         `Formula per day: ${rng(a.volume, b.volume, 'mL')} (${span(a.volume / 1000, b.volume / 1000, fmt)} L) of ${density.toFixed(1)} kcal/mL`;
+      $('tfFluidRec').textContent = rng(a.desired, b.desired, 'mL/day');
+      $('tfFluidRecNote').textContent = `${mLo}–${mHi} mL/kg · formula plus flush water`;
       $('tfFlush').textContent = a.flush === 0 && b.flush === 0 ? 'None needed' : rng(a.flush, b.flush, 'mL');
       $('tfFlushNote').textContent = a.flush === 0 && b.flush === 0
         ? 'Formula alone meets the fluid need'
