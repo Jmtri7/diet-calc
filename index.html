@@ -128,6 +128,47 @@
   .field + .hint { margin-top: 6px; }
   .biglabel { color: var(--muted); font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 2px; }
   .biglabel:first-of-type { margin-top: 0; }
+  .ptable { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  .ptable th, .ptable td { padding: 8px 4px; border-bottom: 1px solid var(--border); text-align: right; vertical-align: top; }
+  .ptable thead th { color: var(--muted); font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+  .ptable th[scope="row"] { text-align: left; font-weight: 600; }
+  .ptable tbody tr:last-child th, .ptable tbody tr:last-child td { border-bottom: 0; }
+  .ptable td { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ptable td.ok { color: var(--ok); font-weight: 600; }
+  .ptable td.warn { color: var(--warn); font-weight: 600; }
+  .ptable small { display: block; color: var(--muted); font-weight: 400; }
+  .mini {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 6px 16px 8px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-align: center;
+  }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+  .smallbtn {
+    font: inherit;
+    font-weight: 600;
+    font-size: .95rem;
+    color: var(--text);
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+  }
+  .smallbtn:hover, .smallbtn:focus-visible { border-color: var(--accent); outline: none; }
+  .copied { color: var(--ok); font-weight: 600; font-size: .9rem; }
+  .printonly { display: none; }
+  @media print {
+    body { background: #fff; color: #000; font-size: 14px; }
+    .tabbar, .noprint, .resetbtn, .disclaimer button { display: none !important; }
+    section { break-inside: avoid; border-color: #999; }
+    /* The Print button prints just the final regimen */
+    body.print-final h1, body.print-final main > section:not(#finalCard), body.print-final .disclaimer { display: none !important; }
+    body.print-final .printonly { display: block; font-weight: 700; margin-bottom: 8px; }
+  }
   .hint.warn { color: var(--warn); font-weight: 600; }
   details summary { cursor: pointer; font-weight: 600; color: var(--accent); padding: 4px 0; }
   details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -158,6 +199,7 @@
     <button class="tab" role="tab" data-page="tube">Tube</button>
   </div>
   <div class="pageno" id="pageno"></div>
+  <div class="mini" id="mini" hidden></div>
 </div>
 
 <main>
@@ -350,10 +392,10 @@
   <section data-pages="tube">
     <h2>Protein per liter</h2>
     <div class="field">
-      <input id="proteinPerL" type="number" inputmode="decimal" min="0" step="any" value="60">
+      <input id="proteinPerL" type="number" inputmode="decimal" min="0" step="any" placeholder="from label">
       <span class="unit">g/L</span>
     </div>
-    <p class="hint">For a formula not listed, enter grams of protein per liter from its label. The 60 g/L shown is only a placeholder.</p>
+    <p class="hint">Pick a product above, or enter grams of protein per liter from the formula label. Protein results stay blank until this is filled in.</p>
   </section>
 
   <section data-pages="tube">
@@ -481,12 +523,7 @@
 
   <section class="results" data-pages="tube">
     <h2>Provided each day</h2>
-    <div class="target" id="tfEnergy"></div>
-    <div class="target" id="tfProtein"></div>
-    <div class="target" id="tfFluid"></div>
-    <div class="target" id="tfTotal"></div>
-    <p class="hint" id="tfSummary"></p>
-    <p class="hint">Needs come from the weight-based, protein and fluid ranges selected on this page. Formula amount = kcal needed &divide; energy density, divided by feedings and rounded to the nearest mL. Bolus flush = (desired fluid &minus; fluid in formula) &divide; (feedings &times; 2), given before and after each feeding. For continuous feeding, formula per day is divided by the hours the pump runs, and the free water is split across the flushes given during those pump hours (hours &divide; flush interval, rounded).</p>
+    <div id="tfTable"></div>
   </section>
 
   <section data-pages="tube">
@@ -509,11 +546,12 @@
         <p class="hint" id="finalFluidHint"></p>
       </div>
     </div>
-    <p class="hint" id="finalGuide">Pick a rate and a fluid total from the recommended ranges to see what the final regimen provides.</p>
+    <p class="hint" id="finalGuide" hidden></p>
   </section>
 
-  <section class="results" data-pages="tube">
+  <section class="results" data-pages="tube" id="finalCard">
     <h2>Final regimen</h2>
+    <div class="printonly" id="printHead"></div>
     <div class="biglabel" id="fnRateLabel">Formula rate</div>
     <div class="bmi-value" id="fnRate">&ndash;</div>
     <div class="bmi-cat" id="fnNote">Enter a final rate</div>
@@ -521,11 +559,17 @@
     <div class="bmi-value" id="fnFlush">&ndash;</div>
     <div class="bmi-cat" id="fnFlushNote">Enter a final total fluid</div>
     <div id="fnLines"></div>
+    <div class="actions noprint" id="fnActions" hidden>
+      <button type="button" class="smallbtn" id="copyBtn">Copy regimen</button>
+      <button type="button" class="smallbtn" id="printBtn">Print</button>
+      <span class="copied" id="copied" role="status"></span>
+    </div>
   </section>
 
   <section data-pages="tube">
     <details>
       <summary>Show calculation breakdown</summary>
+      <p class="hint">Needs come from the energy, protein and fluid ranges selected on this page. Bolus flush = (desired fluid &minus; fluid in formula) &divide; (feedings &times; 2), given before and after each feeding. For continuous feeding, the formula per day is divided by the hours the pump runs, and the free water is split across the flushes given during those pump hours (hours &divide; flush interval, rounded).</p>
       <div id="tfSteps"><p class="hint">Enter the inputs above to see the steps.</p></div>
     </details>
   </section>
@@ -548,6 +592,8 @@
     { id: 'tube', title: 'Tube feeding' },
   ];
   let page = 'body';
+  let miniText = ''; // recommended values pinned under the tab bar on the Tube page
+  let regimenText = ''; // plain-text final regimen for the Copy button
 
   const checked = name => document.querySelector(`input[name="${name}"]:checked`).value;
 
@@ -565,6 +611,8 @@
       const wrongMethod = el.dataset.method && el.dataset.method !== checked('method');
       el.hidden = !(here || viaBasis) || wrongMethod;
     });
+    $('mini').textContent = miniText;
+    $('mini').hidden = page !== 'tube' || !miniText;
   }
 
   function goTo(id, step) {
@@ -585,14 +633,16 @@
   // Swipe right: next page. Swipe left: previous page.
   let touch = null;
   document.addEventListener('touchstart', e => {
-    touch = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    const onControl = e.target.closest && e.target.closest('input, select, textarea, button, label, summary, table');
+    touch = e.touches.length === 1 && !onControl
+      ? { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY } : null;
   }, { passive: true });
   document.addEventListener('touchend', e => {
     if (!touch) return;
     const dx = e.changedTouches[0].clientX - touch.x;
     const dy = e.changedTouches[0].clientY - touch.y;
     touch = null;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) goTo(null, dx > 0 ? 1 : -1);
+    if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 2) goTo(null, dx > 0 ? 1 : -1);
   }, { passive: true });
 
   // ---- Formatting helpers ----
@@ -757,14 +807,18 @@
       : continuous
         ? (Number.isNaN(hours) ? 'Enter hours per day (1–24)' : Number.isNaN(flushEvery) ? 'Enter flush interval' : '')
         : (Number.isNaN(feeds) ? 'Enter feedings per day' : '');
-    const tf = ['tfEnergy', 'tfProtein', 'tfFluid', 'tfTotal', 'tfSummary', 'tfVolume', 'tfFlushNote'];
+    const tf = ['tfVolume', 'tfFlushNote'];
     $('tfBasis').textContent = basisText;
+    miniText = '';
+    regimenText = '';
+    $('fnActions').hidden = true;
     $('tfTitle').textContent = continuous ? 'Formula rate' : 'Formula per feeding';
     const stepsEl = $('tfSteps');
     $('finalRateLabel').textContent = continuous ? 'Final rate' : 'Final volume per feeding';
     $('finalRateUnit').textContent = continuous ? 'mL/hr' : 'mL';
     if (missing) {
       $('finalGuide').classList.remove('warn');
+      $('finalGuide').hidden = true;
       $('finalRateHint').textContent = '';
       $('finalFluidHint').textContent = '';
       $('fnRate').textContent = '–';
@@ -774,6 +828,7 @@
       $('fnLines').innerHTML = '';
       stepsEl.innerHTML = '<p class="hint">Enter the inputs above to see the steps.</p>';
       for (const id of tf) $(id).textContent = '';
+      $('tfTable').innerHTML = '';
       $('tfFeed').textContent = '–';
       $('tfFluidRec').textContent = '–';
       $('tfFluidRecNote').textContent = '';
@@ -822,25 +877,29 @@
         `Formula per day: ${rng(a.volume, b.volume, 'mL')} (${span(a.volume / 1000, b.volume / 1000, fmt)} L) of ${density.toFixed(1)} kcal/mL`;
       $('tfFluidRec').textContent = rng(a.desired, b.desired, 'mL/day');
       $('tfFluidRecNote').textContent = `${mLo}–${mHi} mL/kg · formula plus flush water`;
+      miniText = `Rate ${rng(a.rate, b.rate, rateUnit)} · Fluid ${rng(a.desired, b.desired, 'mL/day')} · Flush ` +
+        (a.flush === 0 && b.flush === 0 ? 'none' : rng(a.flush, b.flush, 'mL'));
       $('tfFlush').textContent = a.flush === 0 && b.flush === 0 ? 'None needed' : rng(a.flush, b.flush, 'mL');
       $('tfFlushNote').textContent = a.flush === 0 && b.flush === 0
         ? 'Formula alone meets the fluid need'
         : `water ${flushWhen}`;
-      $('tfEnergy').textContent =
-        `Energy: ${rng(a.kcal, b.kcal, 'kcal')} (need ${rng(kLo * basisKg, kHi * basisKg, 'kcal')})`;
-      $('tfProtein').textContent = Number.isNaN(gPerL)
-        ? 'Protein: enter grams per liter'
-        : `Protein: ${rng(a.protein, b.protein, 'g')} (need ${rng(pLo * basisKg, pHi * basisKg, 'g')})`;
-      $('tfFluid').textContent =
-        `Fluid from formula (${waterPct}% water): ${rng(a.fluidIn, b.fluidIn, 'mL')}`;
-      $('tfTotal').textContent =
-        `Total fluid with flushes: ${rng(a.total, b.total, 'mL')} (need ${rng(mLo * basisKg, mHi * basisKg, 'mL')})`;
-      $('tfSummary').textContent =
-        `Regimen: ${density.toFixed(1)} kcal/mL formula, ` +
-        (continuous
-          ? `${rng(a.rate, b.rate, 'mL/hr')} continuously for ${fmt(hours)} hours per day`
-          : `${rng(a.rate, b.rate, 'mL')} per feeding, ${feeds} time${feeds === 1 ? '' : 's'} per day`) +
-        (a.flush === 0 && b.flush === 0 ? '.' : `, flushing with ${rng(a.flush, b.flush, 'mL')} water ${flushWhen}.`);
+      // Provided vs need, one row per nutrient. A row is OK only if the whole provided range is inside the need range.
+      // tol lets a value sit slightly outside (used for total fluid, where rounding the flush can add or drop a few mL)
+      const inRange = (v1, v2, lo, hi, tol = 0) =>
+        (Math.round(v1) >= Math.round(lo * (1 - tol)) && Math.round(v2) <= Math.round(hi * (1 + tol)) ? 'ok' : 'warn');
+      const ptable = rows => '<table class="ptable"><thead><tr><th></th><th>Provided</th><th>Need</th></tr></thead><tbody>' +
+        rows.map(r => `<tr><th scope="row">${r.label}</th><td class="${r.state || ''}">` +
+          `${r.state === 'warn' ? '⚠ ' : r.state === 'ok' ? '✓ ' : ''}${r.value}${r.sub ? `<small>${r.sub}</small>` : ''}</td>` +
+          `<td>${r.need || '–'}</td></tr>`).join('') + '</tbody></table>';
+      const eNeed = [kLo * basisKg, kHi * basisKg], pNeed = [pLo * basisKg, pHi * basisKg], fNeed = [mLo * basisKg, mHi * basisKg];
+      $('tfTable').innerHTML = ptable([
+        { label: 'Energy (kcal)', value: span(a.kcal, b.kcal), need: span(eNeed[0], eNeed[1]), state: inRange(a.kcal, b.kcal, eNeed[0], eNeed[1]) },
+        Number.isNaN(gPerL)
+          ? { label: 'Protein (g)', value: 'enter g/L' }
+          : { label: 'Protein (g)', value: span(a.protein, b.protein), need: span(pNeed[0], pNeed[1]), state: inRange(a.protein, b.protein, pNeed[0], pNeed[1]) },
+        { label: `Fluid from formula (mL)`, value: span(a.fluidIn, b.fluidIn), sub: `${waterPct}% water` },
+        { label: 'Total fluid (mL)', value: span(a.total, b.total), need: span(fNeed[0], fNeed[1]), state: inRange(a.total, b.total, fNeed[0], fNeed[1], 0.01) },
+      ]);
 
       // Step-by-step breakdown (low end of each range, then high end)
       const w = fmt(basisKg);
@@ -885,12 +944,12 @@
       // Final regimen: what the chosen rate and fluid total actually provide
       const guide = $('finalGuide');
       guide.classList.toggle('warn', !fits);
+      guide.hidden = !!pRate && fits; // only shown when there is something to flag
       if (!pRate) {
-        $('finalRateHint').textContent = `Recommended: ${rng(eRate[0], eRate[1], rateUnit)} (energy only)`;
-        guide.textContent = 'Enter grams of protein per liter to also check protein. Pick a rate and a fluid total from the recommended ranges.';
+        $('finalRateHint').textContent = `Recommended: ${rng(eRate[0], eRate[1], rateUnit)}`;
+        guide.textContent = 'Enter grams of protein per liter to also check protein (range shown is energy only).';
       } else if (fits) {
-        $('finalRateHint').textContent = `Recommended: ${rng(bothLo, bothHi, rateUnit)} (energy and protein)`;
-        guide.textContent = 'Any rate in the recommended range meets both the energy and the protein need. Pick a fluid total from its range too.';
+        $('finalRateHint').textContent = `Recommended: ${rng(bothLo, bothHi, rateUnit)}`;
       } else {
         $('finalRateHint').textContent = `Energy range: ${rng(eRate[0], eRate[1], rateUnit)}`;
         const name = $('product').value ? $('product').selectedOptions[0].text.replace(/ \(.*\)$/, '') : 'This formula';
@@ -917,12 +976,12 @@
         const protein = Number.isNaN(gPerL) ? NaN : volume / 1000 * gPerL;
         const lines = [];
         const warnings = [];
-        // Compare a final value with its recommended range (ends rounded the way they are shown)
-        const check = (label, val, lo, hi, unit) => {
-          const v = Math.round(val), l = Math.round(lo), h = Math.round(hi);
-          const state = v < l ? 'below' : v > h ? 'above' : 'within';
-          if (state !== 'within') warnings.push(`${label} is ${state} the recommended range`);
-          return `${state === 'within' ? '✓' : '⚠'} ${state} the need of ${rng(lo, hi, unit)}`;
+        const side = (v, lo, hi, tol = 0) =>
+          (Math.round(v) < Math.round(lo * (1 - tol)) ? 'below' : Math.round(v) > Math.round(hi * (1 + tol)) ? 'above' : 'within');
+        const rowState = (label, v, lo, hi, tol = 0) => {
+          const s = side(v, lo, hi, tol);
+          if (s !== 'within') warnings.push(`${label} is ${s} the recommended range`);
+          return s === 'within' ? 'ok' : 'warn';
         };
         const line = (text, cls = '') => lines.push(`<div class="target ${cls}">${text}</div>`);
 
@@ -930,34 +989,39 @@
         $('fnNote').textContent = continuous
           ? `for ${fmt(hours)} hours per day`
           : `${feeds} feeding${feeds === 1 ? '' : 's'} per day`;
-        line(`Formula per day: ${whole(volume)} mL (${liters(volume)} L)`);
-        line(`Energy: ${whole(kcal)} kcal (${fmt(kcal / basisKg)} kcal/kg), ` +
-          check('Energy', kcal, kLo * basisKg, kHi * basisKg, 'kcal'));
-        line(Number.isNaN(protein) ? 'Protein: enter grams per liter'
-          : `Protein: ${fmt(protein)} g (${(protein / basisKg).toFixed(2)} g/kg), ` +
-            check('Protein', protein, pLo * basisKg, pHi * basisKg, 'g'));
-        line(`Fluid from formula: ${whole(fluidIn)} mL (${waterPct}% water)`);
 
-        let summaryFlush = '';
+        let free = NaN, flush = 0, total = NaN;
         if (Number.isNaN(finalFluid)) {
           $('fnFlush').textContent = '–';
           $('fnFlushNote').textContent = 'Enter a final total fluid';
         } else {
-          const free = Math.max(0, finalFluid - fluidIn);
-          const flush = Math.round(free / flushes);
-          const total = fluidIn + flush * flushes;
-          line(`Free water needed: ${whole(free)} mL`);
+          free = Math.max(0, finalFluid - fluidIn);
+          flush = Math.round(free / flushes);
+          total = fluidIn + flush * flushes;
           $('fnFlush').textContent = flush === 0 ? 'None needed' : `${whole(flush)} mL`;
           $('fnFlushNote').textContent = flush === 0
             ? 'the formula alone provides the chosen fluid total'
             : `water ${flushWhen} (${flushes} flushes per day)`;
-          line(`Total fluid: ${whole(total)} mL (${fmt(total / basisKg)} mL/kg), ` +
-            check('Total fluid', total, mLo * basisKg, mHi * basisKg, 'mL'));
-          if (flush > 0) summaryFlush = `, flushing with ${whole(flush)} mL water ${flushWhen}`;
         }
 
+        const volumeLine = `<div class="target">Formula per day: ${whole(volume)} mL (${liters(volume)} L)</div>`;
+        const tableHtml = ptable([
+          { label: 'Energy (kcal)', value: whole(kcal), sub: `${fmt(kcal / basisKg)} kcal/kg`,
+            need: span(eNeed[0], eNeed[1]), state: rowState('Energy', kcal, eNeed[0], eNeed[1]) },
+          Number.isNaN(protein)
+            ? { label: 'Protein (g)', value: 'enter g/L' }
+            : { label: 'Protein (g)', value: fmt(protein), sub: `${(protein / basisKg).toFixed(2)} g/kg`,
+                need: span(pNeed[0], pNeed[1]), state: rowState('Protein', protein, pNeed[0], pNeed[1]) },
+          { label: 'Fluid from formula (mL)', value: whole(fluidIn), sub: `${waterPct}% water` },
+          Number.isNaN(total)
+            ? { label: 'Total fluid (mL)', value: 'enter total' }
+            : { label: 'Free water (mL)', value: whole(free) },
+          ...(Number.isNaN(total) ? [] : [{ label: 'Total fluid (mL)', value: whole(total), sub: `${fmt(total / basisKg)} mL/kg`,
+            need: span(fNeed[0], fNeed[1]), state: rowState('Total fluid', total, fNeed[0], fNeed[1], 0.01) }]),
+        ]);
+
         for (const w of warnings) line(`⚠ Warning: ${w}`, 'warn');
-        if (!warnings.length && !Number.isNaN(protein) && !Number.isNaN(finalFluid)) {
+        if (!warnings.length && !Number.isNaN(protein) && !Number.isNaN(total)) {
           line('✓ Energy, protein and fluid are all within the recommended ranges', 'ok');
         }
 
@@ -967,8 +1031,31 @@
         line(`Regimen: ${productName}, ` +
           (continuous
             ? `${fmt(finalRate)} mL/hr for ${fmt(hours)} hours per day`
-            : `${fmt(finalRate)} mL ${feeds} time${feeds === 1 ? '' : 's'} per day`) + summaryFlush + '.');
-        $('fnLines').innerHTML = lines.join('');
+            : `${fmt(finalRate)} mL ${feeds} time${feeds === 1 ? '' : 's'} per day`) +
+          (flush > 0 ? `, flushing with ${whole(flush)} mL water ${flushWhen}` : '') + '.');
+        $('fnLines').innerHTML = volumeLine + tableHtml + lines.join('');
+
+        // Plain-text copy of the final regimen, and a dated heading for printing
+        const today = new Date().toLocaleDateString();
+        const plan = [
+          `Tube feeding regimen (${today})`,
+          basisText.replace(/^Based on (.*) weight: /, 'Weight used ($1): '),
+          `Formula: ${productName}${$('product').value ? ` (${density.toFixed(1)} kcal/mL)` : ''}`,
+          continuous
+            ? `Rate: ${fmt(finalRate)} mL/hr for ${fmt(hours)} hours per day`
+            : `Volume: ${fmt(finalRate)} mL per feeding, ${feeds} feeding${feeds === 1 ? '' : 's'} per day`,
+          flush > 0 ? `Free water flush: ${whole(flush)} mL ${flushWhen} (${flushes} flushes per day)`
+            : `Free water flush: ${Number.isNaN(total) ? 'not set' : 'none needed'}`,
+          `Formula per day: ${whole(volume)} mL`,
+          `Energy: ${whole(kcal)} kcal (${fmt(kcal / basisKg)} kcal/kg; need ${span(eNeed[0], eNeed[1])} kcal)`,
+        ];
+        if (!Number.isNaN(protein)) plan.push(`Protein: ${fmt(protein)} g (${(protein / basisKg).toFixed(2)} g/kg; need ${span(pNeed[0], pNeed[1])} g)`);
+        plan.push(`Fluid from formula: ${whole(fluidIn)} mL`);
+        if (!Number.isNaN(total)) plan.push(`Total fluid: ${whole(total)} mL (${fmt(total / basisKg)} mL/kg; need ${span(fNeed[0], fNeed[1])} mL)`);
+        for (const w of warnings) plan.push(`Warning: ${w}`);
+        regimenText = plan.join('\n');
+        $('printHead').textContent = `Tube feeding regimen – ${today}`;
+        $('fnActions').hidden = false;
       }
     }
 
@@ -1021,11 +1108,40 @@
     try {
       const data = JSON.parse(localStorage.getItem(STORE) || '{}');
       fields.forEach(el => { if (el.id in data) el.value = data[el.id]; });
+      // Earlier versions prefilled 60 g/L as a placeholder: don't carry that forward as a real value
+      if (data.proteinPerL === '60' && !data.product) $('proteinPerL').value = '';
       document.querySelectorAll('input[type="radio"]').forEach(r => {
         if (data['radio:' + r.name] === r.value) r.checked = true;
       });
     } catch (e) { /* unreadable saved data: use defaults */ }
   }
+  // Copy the final regimen as plain text; print just the final regimen card
+  let copiedTimer;
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fall back below */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch (e) { return false; }
+  }
+  $('copyBtn').addEventListener('click', async () => {
+    const ok = await copyText(regimenText);
+    $('copied').textContent = ok ? 'Copied' : 'Copy is not available in this browser';
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => { $('copied').textContent = ''; }, 2500);
+  });
+  $('printBtn').addEventListener('click', () => {
+    document.body.classList.add('print-final');
+    window.print();
+  });
+  window.addEventListener('afterprint', () => document.body.classList.remove('print-final'));
+
   $('reset').addEventListener('click', () => {
     if (!confirm('Clear all inputs on every page and restore the defaults?')) return;
     try { localStorage.removeItem(STORE); } catch (e) { /* ignore */ }
