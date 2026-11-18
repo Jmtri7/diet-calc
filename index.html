@@ -592,6 +592,8 @@
 </main>
 
 <script>
+  // Bump on every push so the live page can be checked at a glance (shown under the tab bar)
+  const APP_VERSION = '1.0.0';
   const LB_PER_KG = 2.20462262185;
   const $ = id => document.getElementById(id);
   const lb = $('lb'), kg = $('kg'), inch = $('in'), cm = $('cm'), age = $('age');
@@ -615,7 +617,7 @@
     const needsBody = checked('basis') !== 'actual';
     document.querySelectorAll('.tab').forEach(t =>
       t.setAttribute('aria-selected', String(t.dataset.page === page)));
-    $('pageno').textContent = `Page ${idx + 1} of ${PAGES.length}`;
+    $('pageno').textContent = `Page ${idx + 1} of ${PAGES.length} · v${APP_VERSION}`;
     $('pageTitle').textContent = PAGES[idx].title;
     document.title = `${PAGES[idx].title} – Diet Calculator`;
     document.querySelectorAll('[data-pages]').forEach(el => {

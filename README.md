@@ -18,4 +18,6 @@ Energy, protein, fluid and tube feeding can use actual, ideal or adjusted body w
 
 Your entries are saved in your browser (localStorage) and restored on your next visit. The Reset all inputs button at the bottom clears them.
 
+The version number (for example v1.0.0) shows under the tab bar so you can tell which build is live. It is the `APP_VERSION` constant at the top of the script in `index.html`: bump it with each push.
+
 Estimates for education only. Not medical advice.
