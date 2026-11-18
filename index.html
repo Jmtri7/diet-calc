@@ -547,10 +547,14 @@
         <p class="hint" id="finalRateHint"></p>
       </div>
       <div>
-        <label for="finalFluid">Final total fluid</label>
-        <div class="field">
+        <label for="finalFluid" id="finalFluidLabel">Final total fluid</label>
+        <div class="field" data-method-inline="bolus">
           <input id="finalFluid" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
           <span class="unit">mL/day</span>
+        </div>
+        <div class="field" data-method-inline="continuous">
+          <input id="finalFluidHr" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
+          <span class="unit">mL/hr</span>
         </div>
         <p class="hint" id="finalFluidHint"></p>
       </div>
@@ -619,6 +623,9 @@
       const viaBasis = needsBody && (el.dataset.pagesBasis || '').split(' ').includes(page);
       const wrongMethod = el.dataset.method && el.dataset.method !== checked('method');
       el.hidden = !(here || viaBasis) || wrongMethod;
+    });
+    document.querySelectorAll('[data-method-inline]').forEach(el => {
+      el.hidden = el.dataset.methodInline !== checked('method');
     });
     $('mini').textContent = miniText;
     $('mini').hidden = page !== 'tube' || !miniText;
@@ -885,7 +892,8 @@
       $('tfVolume').textContent =
         `Formula per day: ${rng(a.volume, b.volume, 'mL')} (${span(a.volume / 1000, b.volume / 1000, fmt)} L) of ${density.toFixed(1)} kcal/mL`;
       $('tfFluidRec').textContent = rng(a.desired, b.desired, 'mL/day');
-      $('tfFluidRecNote').textContent = `${mLo}–${mHi} mL/kg · formula plus flush water`;
+      $('tfFluidRecNote').textContent = `${mLo}–${mHi} mL/kg · formula plus flush water` +
+        (continuous ? ` · ${rng(a.desired / hours, b.desired / hours, 'mL/hr', fmt)}` : '');
       miniText = `Rate ${rng(a.rate, b.rate, rateUnit)} · Fluid ${rng(a.desired, b.desired, 'mL/day')} · Flush ` +
         (a.flush === 0 && b.flush === 0 ? 'none' : rng(a.flush, b.flush, 'mL'));
       $('tfFlush').textContent = a.flush === 0 && b.flush === 0 ? 'None needed' : rng(a.flush, b.flush, 'mL');
@@ -969,9 +977,13 @@
         guide.textContent = `${name} can't meet both needs at once: energy needs ${rng(eRate[0], eRate[1], rateUnit)} but protein needs ${rng(pRate[0], pRate[1], rateUnit)}. ` +
           `${fix}, so consider a different formula or a protein modular. Showing the energy range; protein will be ${pRate[0] > eRate[1] ? 'below' : 'above'} the need.`;
       }
-      $('finalFluidHint').textContent = `Recommended: ${rng(a.desired, b.desired, 'mL')}`;
+      $('finalFluidLabel').htmlFor = continuous ? 'finalFluidHr' : 'finalFluid';
+      $('finalFluidHint').textContent = continuous
+        ? `Recommended: ${rng(a.desired / hours, b.desired / hours, 'mL/hr', fmt)} (${rng(a.desired, b.desired, 'mL/day')})`
+        : `Recommended: ${rng(a.desired, b.desired, 'mL')}`;
       const finalRate = positive($('finalRate'));
-      const finalFluid = positive($('finalFluid'));
+      // Continuous: the entered mL/hr runs over the pump hours, so convert it to a daily total
+      const finalFluid = continuous ? positive($('finalFluidHr')) * hours : positive($('finalFluid'));
       $('fnRateLabel').textContent = continuous ? 'Formula rate' : 'Formula per feeding';
       if (Number.isNaN(finalRate)) {
         $('fnRate').textContent = '–';
@@ -1026,7 +1038,7 @@
           Number.isNaN(total)
             ? { label: 'Total fluid (mL)', value: 'enter total' }
             : { label: 'Free water (mL)', value: whole(free) },
-          ...(Number.isNaN(total) ? [] : [{ label: 'Total fluid (mL)', value: whole(total), sub: `${fmt(total / basisKg)} mL/kg`,
+          ...(Number.isNaN(total) ? [] : [{ label: 'Total fluid (mL)', value: whole(total), sub: `${fmt(total / basisKg)} mL/kg` + (continuous ? ` · ${fmt(total / hours)} mL/hr` : ''),
             need: span(fNeed[0], fNeed[1]), state: rowState('Total fluid', total, fNeed[0], fNeed[1], 0.01) }]),
         ]);
 
@@ -1061,7 +1073,7 @@
         ];
         if (!Number.isNaN(protein)) plan.push(`Protein: ${fmt(protein)} g (${(protein / basisKg).toFixed(2)} g/kg; need ${span(pNeed[0], pNeed[1])} g)`);
         plan.push(`Fluid from formula: ${whole(fluidIn)} mL`);
-        if (!Number.isNaN(total)) plan.push(`Total fluid: ${whole(total)} mL (${fmt(total / basisKg)} mL/kg; need ${span(fNeed[0], fNeed[1])} mL)`);
+        if (!Number.isNaN(total)) plan.push(`Total fluid: ${whole(total)} mL${continuous ? ` (${fmt(total / hours)} mL/hr)` : ''} (${fmt(total / basisKg)} mL/kg; need ${span(fNeed[0], fNeed[1])} mL)`);
         for (const w of warnings) plan.push(`Warning: ${w}`);
         regimenText = plan.join('\n');
         $('printHead').textContent = `Tube feeding regimen – ${today}`;
@@ -1086,7 +1098,7 @@
   link(cm, inch, v => v / 2.54);
 
   // Registered after the link() handlers so paired fields are in sync first
-  [lb, kg, inch, cm, age, $('proteinPerL'), $('feeds'), $('hours'), $('flushEvery'), $('finalRate'), $('finalFluid')].forEach(el => el.addEventListener('input', update));
+  [lb, kg, inch, cm, age, $('proteinPerL'), $('feeds'), $('hours'), $('flushEvery'), $('finalRate'), $('finalFluid'), $('finalFluidHr')].forEach(el => el.addEventListener('input', update));
   document.querySelectorAll('input[type="radio"], select:not(#product)')
     .forEach(el => el.addEventListener('change', update));
 
